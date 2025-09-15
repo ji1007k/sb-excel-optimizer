@@ -1,0 +1,120 @@
+# Excel Download Performance Test
+# 20명 동시 다운로드 시뮬레이션
+
+### 1. 테스트 데이터 생성 (10만건)
+POST http://localhost:8081/api/test-data/generate?count=100000
+Content-Type: application/json
+
+###
+
+### 2. 데이터 개수 확인
+GET http://localhost:8081/api/test-data/count
+
+###
+
+### 3. 스트리밍 다운로드 요청 #1
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+### 4. 스트리밍 다운로드 요청 #2
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+### 5. 스트리밍 다운로드 요청 #3
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+### 6. 스트리밍 다운로드 요청 #4 (큐 대기)
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+### 7. 스트리밍 다운로드 요청 #5 (큐 대기)
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+### 8. 페이징 다운로드 요청 #1 (비교용)
+POST http://localhost:8081/api/download/excel/paging
+Content-Type: application/json
+
+###
+
+### 9. 페이징 다운로드 요청 #2 (비교용)
+POST http://localhost:8081/api/download/excel/paging
+Content-Type: application/json
+
+###
+
+### 10. 큐 상태 조회
+GET http://localhost:8081/api/download/queue/status
+
+###
+
+### 11-20. 추가 동시 요청들 (20명 시뮬레이션)
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+POST http://localhost:8081/api/download/excel/streaming
+Content-Type: application/json
+
+###
+
+# 테스트 완료 후 큐 상태 재확인
+GET http://localhost:8081/api/download/queue/status
+
+###
+
+# 생성된 파일 다운로드 테스트
+# (실제 파일명은 응답에서 확인)
+# GET http://localhost:8081/api/download/file/test_data_streaming_{{uuid}}.xlsx

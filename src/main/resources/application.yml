@@ -1,0 +1,137 @@
+# Excel Performance Optimizer Configuration
+
+spring:
+  application:
+    name: excel-performance-optimizer
+
+  # 프로파일 기본값
+  profiles:
+    active: dev
+
+  # JPA 설정
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        # Batch Insert 최적화
+        jdbc:
+          batch_size: 1000
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+# 로깅 설정
+logging:
+  level:
+    com.performance.excel: DEBUG
+    org.springframework.web.socket: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 서버 설정
+server:
+  port: 8081  # ecommerce와 다른 포트 사용
+
+# Excel 다운로드 설정
+excel:
+  download:
+    directory: downloads/
+    max-concurrent: 3
+    batch-size: 1000
+  security:
+    max-file-size: 100MB
+    max-rows: 1000000
+    max-columns: 1000
+    enable-strict-validation: true
+
+---
+# 테스트 프로파일
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  # H2 Database 설정 (테스트용)
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # H2 Console 설정
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+---
+# 개발 프로파일
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  # H2 Database 설정 (개발용 - 파일 기반)
+  datasource:
+    url: jdbc:h2:file:./data/excel_optimizer;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # H2 Console 설정
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+---
+# 운영 프로파일
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # PostgreSQL Database 설정 (운영용)
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/excel_optimizer}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:excel_user}
+    password: ${DB_PASSWORD:excel_pwd}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+  # 운영 로깅 설정
+  logging:
+    level:
+      com.performance.excel: INFO
+      org.springframework.web.socket: WARN
