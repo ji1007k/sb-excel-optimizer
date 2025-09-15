@@ -30,6 +30,41 @@ public class DownloadController {
 
 
     /**
+     * 당시 진짜 문제 방식 Excel 다운로드 (동기 처리 - 완성까지 기다려야 함!)
+     */
+    @PostMapping("/excel/old-way")
+    public ResponseEntity<Resource> downloadExcelOldWay(
+            @RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        String requestId = UUID.randomUUID().toString();
+        String finalUserId = userId;
+
+        log.warn("💥 당시 진짜 문제 방식 - 동기 처리로 완성까지 기다려야 함! 사용자: {}", finalUserId);
+
+        try {
+            // 서비스에서 파일명만 받아옴
+            String fileName = excelDownloadService.processOldWayDirectly(finalUserId, requestId);
+            
+            // Controller에서 HTTP 응답 처리
+            File file = new File(getDownloadPath() + fileName);
+            if (!file.exists()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Resource resource = new FileSystemResource(file);
+            
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(resource);
+            
+        } catch (Exception e) {
+            log.error("당시 방식 다운로드 실패: {}", requestId, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
      * 페이징 방식 Excel 다운로드 (기존 방식 - 비교용)
      */
     @PostMapping("/excel/paging")
@@ -155,7 +190,7 @@ public class DownloadController {
             return ResponseEntity.internalServerError().build();
         }
     }
-    
+
     /**
      * 파일명 보안 검증
      */

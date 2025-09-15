@@ -9,8 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.springframework.beans.factory.annotation.Value;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,85 @@ public class ExcelDownloadService {
     private String downloadDirectory;
 
     private static final int BATCH_SIZE = 1000;
+    
+    /**
+     * 당시 방식: 큐 없이 바로 처리! (동기 처리 - 완성까지 기다려야 함)
+     */
+    public String processOldWayDirectly(String userId, String requestId) {
+        log.warn("💥 당시 방식 바로 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
+        
+        try {
+            DownloadRequest request = DownloadRequest.builder()
+                    .requestId(requestId)
+                    .fileName("old_way_direct_" + requestId + ".xlsx")
+                    .downloadType(DownloadRequest.DownloadType.OLD_WAY)
+                    .userId(userId)
+                    .build();
+            
+            // 동기 처리 - 완성까지 기다림!
+            processWithOldWay(request);
+            
+            // 파일 경로만 반환
+            return request.getFileName();
+                    
+        } catch (Exception e) {
+            log.error("당시 방식 바로 처리 실패: {}", requestId, e);
+            throw new RuntimeException("당시 방식 처리 실패: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 당시 문제 방식: XSSFWorkbook + 전체조회
+     */
+    private void processWithOldWay(DownloadRequest request) {
+        log.warn("💥 당시 문제 방식 처리: {}", request.getRequestId());
+        
+        long totalCount = testDataRepository.getTotalCount();
+        
+        // 전체 데이터 한번에 조회 (문제!)
+        List<TestData> allData = testDataRepository.findAll();
+        
+        // XSSFWorkbook으로 엑셀 생성 (메모리 폭탄!)
+        createExcelWithXSSF(request, allData, totalCount);
+    }
+    
+    private void createExcelWithXSSF(DownloadRequest request, List<TestData> allData, long totalCount) {
+        String filePath = getDownloadDir() + request.getFileName();
+        
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Test Data");
+            
+            setColumnWidths(sheet);
+            createExcelHeader(sheet, workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+            
+            int rowIndex = 1;
+            for (TestData data : allData) {
+                Row row = sheet.createRow(rowIndex++);
+                
+                createExcelCell(row, 0, data.getId(), dataStyle);
+                createExcelCell(row, 1, data.getName(), dataStyle);
+                createExcelCell(row, 2, data.getDescription(), dataStyle);
+                createExcelCell(row, 3, data.getValue(), dataStyle);
+                createExcelCell(row, 4, data.getCategory(), dataStyle);
+                createExcelCell(row, 5, data.getCreatedAt().format(
+                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")), dataStyle);
+            }
+            
+            try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+                workbook.write(fileOut);
+            }
+            
+            String downloadUrl = "/api/download/file/" + request.getFileName();
+            DownloadProgress completedProgress = DownloadProgress.completed(request.getRequestId(), downloadUrl);
+            progressWebSocketHandler.sendProgress(request.getRequestId(), completedProgress);
+            
+        } catch (Exception e) {
+            log.error("XSSFWorkbook 파일 생성 실패: {}", request.getRequestId(), e);
+            throw new RuntimeException("XSSFWorkbook 파일 생성 실패: " + e.getMessage(), e);
+        }
+    }
+
     
     /**
      * 다운로드 디렉토리 경로 반환 (Spring 관리)
@@ -159,6 +239,7 @@ public class ExcelDownloadService {
                 case PAGING -> processWithPaging(request);
                 case STREAMING -> processWithStreaming(request);
                 case FAST_EXCEL -> processWithFastExcel(request);
+                case OLD_WAY -> processWithOldWay(request);
                 default -> throw new IllegalArgumentException("Unsupported download type: " + request.getDownloadType());
             }
         } catch (Exception e) {

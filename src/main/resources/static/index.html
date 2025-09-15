@@ -54,6 +54,10 @@
                     <strong>⚠️ 중요:</strong> 아래 버튼들을 여러 번 클릭하여 "20명 동시 다운로드" 상황을 시뮬레이션하세요!
                 </div>
                 <div class="button-group">
+                    <button class="btn btn-danger" onclick="downloadExcel('old-way')" 
+                            style="background: #d32f2f; font-weight: bold;">
+                        XSSF 페이징X 큐X
+                    </button>
                     <button class="btn btn-success" onclick="downloadExcel('streaming')">
                         스트리밍 다운로드 (메모리 최적화)
                     </button>
