@@ -82,25 +82,27 @@ spring:
     activate:
       on-profile: dev
 
-  # H2 Database 설정 (개발용 - 파일 기반)
+  # PostgreSQL Database 설정 (개발용)
   datasource:
-    url: jdbc:h2:file:./data/excel_optimizer;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5432/ec_db
+    driver-class-name: org.postgresql.Driver
+    username: ec_user
+    password: ec_pwd
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
   jpa:
     hibernate:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-
-  # H2 Console 설정
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        show_sql: false
 
 ---
 # 운영 프로파일
