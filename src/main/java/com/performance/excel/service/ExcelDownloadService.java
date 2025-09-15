@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,26 +38,78 @@ public class ExcelDownloadService {
     @Qualifier("downloadTaskExecutor")
     private final Executor downloadTaskExecutor;
     
-    private static final String DOWNLOAD_DIR = "downloads/";
+    @Value("${excel.download.directory:downloads/}")
+    private String downloadDirectory;
+
     private static final int BATCH_SIZE = 1000;
+    
+    /**
+     * 다운로드 디렉토리 경로 반환 (Spring 관리)
+     */
+    private String getDownloadDir() {
+        String currentDir = System.getProperty("user.dir");
+        String javaClassPath = System.getProperty("java.class.path");
+        String userHome = System.getProperty("user.home");
+
+        // 🔍 디버깅 정보 출력
+        log.debug("🔍 === 실행 환경 분석 ===");
+        log.info("📂 Current Working Directory: {}", currentDir);
+        log.debug("📝 Java Class Path: {}", javaClassPath);
+        log.debug("🏠 User Home: {}", userHome);
+        log.debug("⚙️ Download Directory Setting: {}", downloadDirectory);
+
+        // IDE에서 실행인지 gradle에서 실행인지 확인
+        boolean isIdeExecution = javaClassPath.contains("idea") || javaClassPath.contains("intellij");
+        boolean isGradleExecution = javaClassPath.contains("gradle");
+
+        log.debug("🖥️ IDE 실행: {}", isIdeExecution);
+        log.debug("🐘 Gradle 실행: {}", isGradleExecution);
+
+        // 상대 경로인 경우 절대 경로로 변환
+        String finalPath;
+        if (!downloadDirectory.startsWith("/") && !downloadDirectory.contains(":")) {
+            finalPath = currentDir + File.separator + downloadDirectory;
+        } else {
+            finalPath = downloadDirectory;
+        }
+        
+        // 디렉토리 생성
+        File dir = new File(finalPath);
+        if (!dir.exists()) {
+            boolean created = dir.mkdirs();
+            log.info("📁 Download directory created: {} (success: {})", finalPath, created);
+        } else {
+            log.info("📁 Download directory exists: {}", finalPath);
+        }
+        
+        String result = finalPath.endsWith(File.separator) ? finalPath : finalPath + File.separator;
+        log.info("🎯 최종 다운로드 경로: {}", result);
+        log.info("🔍 === 분석 완료 ===");
+        
+        return result;
+    }
     
     /**
      * 다운로드 요청 처리 (큐에 추가)
      */
-    public String requestDownload(DownloadRequest.DownloadType downloadType, String sessionId, String requestId) {
+    public String requestDownload(DownloadRequest.DownloadType downloadType, String userId, String requestId) {
         String fileName = String.format("test_data_%s_%s.xlsx", downloadType.name().toLowerCase(), requestId);
         
         DownloadRequest request = DownloadRequest.builder()
                 .requestId(requestId)
                 .fileName(fileName)
                 .downloadType(downloadType)
-                .sessionId(sessionId)
+                .userId(userId)
                 .build();
         
         boolean enqueued = downloadQueue.enqueue(request);
         if (enqueued) {
             DownloadProgress progress = DownloadProgress.queued(requestId);
-            progressWebSocketHandler.sendProgress(sessionId, progress);
+            try {
+                progressWebSocketHandler.sendProgress(userId, progress);
+            } catch (Exception e) {
+                log.warn("Failed to send queued progress: {}", e.getMessage());
+            }
             
             // 큐 처리 시작
             processQueue();
@@ -81,7 +134,11 @@ public class ExcelDownloadService {
                 } catch (Exception e) {
                     log.error("Download processing failed: {}", request.getRequestId(), e);
                     DownloadProgress failedProgress = DownloadProgress.failed(request.getRequestId(), e.getMessage());
-                    progressWebSocketHandler.sendProgress(request.getSessionId(), failedProgress);
+                    try {
+                        progressWebSocketHandler.sendProgress(request.getUserId(), failedProgress);
+                    } catch (Exception wsException) {
+                        log.warn("Failed to send failure progress: {}", wsException.getMessage());
+                    }
                 } finally {
                     downloadQueue.markCompleted(request.getRequestId());
                     // 다음 요청 처리
@@ -134,9 +191,13 @@ public class ExcelDownloadService {
             allData.addAll(dataPage.getContent());
             processedCount += dataPage.getContent().size();
             
-            // 진행률 업데이트
+            // 진행률 업데이트 빈도 조절 (WebSocket 안정성 확보)
             DownloadProgress progress = DownloadProgress.processing(request.getRequestId(), totalCount, processedCount);
-            progressWebSocketHandler.sendProgress(request.getSessionId(), progress);
+            try {
+                progressWebSocketHandler.sendProgress(request.getUserId(), progress);
+            } catch (Exception e) {
+                log.warn("Failed to send progress update: {}", e.getMessage());
+            }
             
             page++;
             
@@ -161,22 +222,23 @@ public class ExcelDownloadService {
         log.info("Processing with JDBC STREAMING method: {}", request.getRequestId());
         
         long totalCount = testDataRepository.getTotalCount();
-        String filePath = DOWNLOAD_DIR + request.getFileName();
+        String filePath = getDownloadDir() + request.getFileName();
         
-        // 다운로드 디렉토리 생성
-        File downloadDir = new File(DOWNLOAD_DIR);
-        if (!downloadDir.exists()) {
-            downloadDir.mkdirs();
-        }
+        log.info("📄 파일 저장 예정 경로: {}", filePath);
+        log.info("📁 파일이 저장될 디렉토리: {}", new File(filePath).getParent());
         
         try {
             // JDBC ResultSet 기반 스트리밍으로 엑셀 직접 생성
             createExcelWithJdbcStreaming(request, filePath, totalCount);
             
-            // 완료 알림
+            // 완료 알림 (안전한 WebSocket 전송)
             String downloadUrl = "/api/download/file/" + request.getFileName();
             DownloadProgress completedProgress = DownloadProgress.completed(request.getRequestId(), downloadUrl);
-            progressWebSocketHandler.sendProgress(request.getSessionId(), completedProgress);
+            try {
+                progressWebSocketHandler.sendProgress(request.getUserId(), completedProgress);
+            } catch (Exception e) {
+                log.warn("Failed to send completion progress: {}", e.getMessage());
+            }
             
         } catch (Exception e) {
             log.error("JDBC streaming download failed: {}", request.getRequestId(), e);
@@ -240,21 +302,20 @@ public class ExcelDownloadService {
                     
                     processedCount++;
                     
-                    // 진행률 업데이트 (1000건마다)
-                    if (processedCount % 1000 == 0) {
+                    // 진행률 업데이트 빈도 조절 (5000건마다 - WebSocket 부하 줄이기)
+                    if (processedCount % 5000 == 0) {
                         DownloadProgress progress = DownloadProgress.processing(
                                 request.getRequestId(), totalCount, processedCount);
-                        progressWebSocketHandler.sendProgress(request.getSessionId(), progress);
+                        try {
+                            progressWebSocketHandler.sendProgress(request.getUserId(), progress);
+                        } catch (Exception e) {
+                            log.warn("Failed to send progress update: {}", e.getMessage());
+                        }
                     }
                 }
                 
                 // 중요: 청크 처리 후 메모리에서 제거
                 chunkData.clear();
-                
-                // 주기적으로 임시 파일로 플러시
-                if (processedCount % 5000 == 0) {
-                    workbook.flushRows();
-                }
                 
                 log.debug("Processed chunk: {}-{} ({} total rows)", offset, offset + CHUNK_SIZE, processedCount);
             }
@@ -262,6 +323,7 @@ public class ExcelDownloadService {
             // 파일 저장
             try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
                 workbook.write(fileOut);
+                log.info("📄 Excel file saved to: {}", filePath);
             }
             
             workbook.dispose(); // 임시 파일 정리
@@ -362,7 +424,7 @@ public class ExcelDownloadService {
      */
     private void createExcelFile(DownloadRequest request, List<TestData> allData, long totalCount) {
         try {
-            String filePath = DOWNLOAD_DIR + request.getFileName();
+            String filePath = getDownloadDir() + request.getFileName();
             
             // SXSSFWorkbook으로 메모리 효율적 처리
             try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
@@ -383,11 +445,6 @@ public class ExcelDownloadService {
                     createExcelCell(row, 4, data.getCategory(), dataStyle);
                     createExcelCell(row, 5, data.getCreatedAt().format(
                             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")), dataStyle);
-                    
-                    // 주기적 플러시
-                    if (rowIndex % 5000 == 0) {
-                        workbook.flushRows();
-                    }
                 }
                 
                 // 파일 저장
@@ -398,10 +455,14 @@ public class ExcelDownloadService {
                 workbook.dispose();
             }
             
-            // 완료 알림
+            // 완료 알림 (안전한 WebSocket 전송)
             String downloadUrl = "/api/download/file/" + request.getFileName();
             DownloadProgress completedProgress = DownloadProgress.completed(request.getRequestId(), downloadUrl);
-            progressWebSocketHandler.sendProgress(request.getSessionId(), completedProgress);
+            try {
+                progressWebSocketHandler.sendProgress(request.getUserId(), completedProgress);
+            } catch (Exception e) {
+                log.warn("Failed to send completion progress: {}", e.getMessage());
+            }
             
         } catch (Exception e) {
             log.error("Excel file creation failed: {}", request.getRequestId(), e);

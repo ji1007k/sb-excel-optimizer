@@ -14,6 +14,16 @@
         </div>
         
         <div class="content">
+            <!-- WebSocket 연결 상태 -->
+            <div class="section">
+                <h2>📡 WebSocket 연결</h2>
+                <span id="wsStatus" class="status disconnected">연결 해제됨</span>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="connectWebSocket()">연결</button>
+                    <button class="btn btn-danger" onclick="disconnectWebSocket()">연결 해제</button>
+                </div>
+            </div>
+
             <!-- 테스트 데이터 관리 -->
             <div class="section">
                 <h2>📊 테스트 데이터 관리</h2>
@@ -103,13 +113,28 @@
         let websocket;
         let progressItems = new Map();
         
+        let currentUserId = null;
+
+        // 사용자 정보 및 WebSocket 초기화
+        async function initialize() {
+            try {
+                currentUserId = `user_${Date.now() + '_' + Math.random().toString(36).substring(2, 9)}`;
+                addLog(`🔗 사용자 ID 초기화: ${currentUserId.substring(0, 8)}...`);
+                
+                // WebSocket 연결
+                connectWebSocket(currentUserId);
+            } catch (error) {
+                addLog(`❌ 사용자 초기화 실패: ${error.message}`);
+            }
+        }
+        
         // WebSocket 연결
         function connectWebSocket() {
-            const sessionId = 'test-session-' + Date.now();
-            websocket = new WebSocket(`ws://localhost:8081/ws/download-progress?sessionId=${sessionId}`);
+            websocket = new WebSocket(`ws://localhost:8081/ws/download-progress?userId=${currentUserId}`);
             
             websocket.onopen = function() {
-                addLog('✅ WebSocket 연결됨 - 실시간 진행률 수신 가능');
+                updateWSStatus(true);
+                addLog('✅ WebSocket 연결됨 - 사용자 ID: ' + currentUserId.substring(0, 8) + '...');
             };
             
             websocket.onmessage = function(event) {
@@ -118,9 +143,28 @@
             };
             
             websocket.onclose = function() {
+                updateWSStatus(false);
                 addLog('❌ WebSocket 연결 끊김');
-                setTimeout(connectWebSocket, 3000); // 재연결 시도
+                setTimeout(() => connectWebSocket(currentUserId), 3000);
             };
+
+            websocket.onerror = function(error) {
+                addLog('WebSocket 오류: ' + error);
+            };
+        }
+
+        // WebSocket 연결 해제
+        function disconnectWebSocket() {
+            if (websocket) {
+                websocket.close();
+            }
+        }
+
+        // WebSocket 상태 업데이트
+        function updateWSStatus(connected) {
+            const status = document.getElementById('wsStatus');
+            status.textContent = connected ? '연결됨' : '연결 해제됨';
+            status.className = 'status ' + (connected ? 'connected' : 'disconnected');
         }
         
         // 진행률 업데이트
@@ -206,9 +250,19 @@
         // Excel 다운로드
         async function downloadExcel(type) {
             addLog(`📥 ${type} 다운로드 요청...`);
+            
+            // 세션이 없으면 먼저 초기화
+            if (!currentUserId) {
+                await initialize();
+            }
+            
             try {
                 const response = await fetch(`/api/download/excel/${type}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-Id': currentUserId  // 헤더로 사용자 ID 전달
+                    }
                 });
                 const result = await response.json();
                 addLog(`✅ 다운로드 요청 성공: ${result.requestId}`);
@@ -242,14 +296,20 @@
             const promises = [];
             for (let i = 1; i <= 20; i++) {
                 promises.push(
-                    fetch('/api/download/excel/streaming', { method: 'POST' })
-                        .then(response => response.json())
-                        .then(result => {
-                            addLog(`👤 사용자 ${i}: 요청 완료 (${result.requestId})`);
-                        })
-                        .catch(error => {
-                            addLog(`👤 사용자 ${i}: 요청 실패 (${error.message})`);
-                        })
+                    fetch('/api/download/excel/streaming', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-Id': currentUserId  // 헤더로 사용자 ID 전달
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        addLog(`👤 사용자 ${i}: 요청 완료 (${result.requestId})`);
+                    })
+                    .catch(error => {
+                        addLog(`👤 사용자 ${i}: 요청 실패 (${error.message})`);
+                    })
                 );
             }
             
@@ -276,7 +336,10 @@
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', function() {
             addLog('🚀 Excel Download Performance Optimizer 시작');
-            connectWebSocket();
+            
+            // 사용자 정보 및 WebSocket 초기화
+            initialize();
+            
             getDataCount();
             getQueueStatus();
             

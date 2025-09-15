@@ -13,7 +13,7 @@ public class DownloadRequest {
     private String requestId;
     private String fileName;
     private DownloadType downloadType;
-    private String sessionId;
+    private String userId;
     
     public enum DownloadType {
         STREAMING,    // JDBC 스트리밍 방식 (메모리 최적화)

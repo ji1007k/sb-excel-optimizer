@@ -23,24 +23,24 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     
-    // HTTP 세션 ID -> 웹소켓 세션 ID 매핑
-    private final ConcurrentHashMap<String, String> httpToWebSocketSessionMapping = new ConcurrentHashMap<>();
+    // 사용자 ID -> 웹소켓 세션 ID 매핑
+    private final ConcurrentHashMap<String, String> userIdToWebSocketSessionMapping = new ConcurrentHashMap<>();
     
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String webSocketSessionId = session.getId();
         sessions.put(webSocketSessionId, session);
         
-        // URL 쿼리 파라미터에서 HTTP 세션 ID 추출
-        String httpSessionId = extractHttpSessionId(session);
-        log.info("WebSocket connection established - WS ID: {}, HTTP Session: {}", 
-            webSocketSessionId, httpSessionId);
+        // URL 쿼리 파라미터에서 사용자 ID 추출
+        String userId = extractUserId(session);
+        log.info("WebSocket connection established - WS ID: {}, USER ID: {}",
+            webSocketSessionId, userId);
         
-        if (httpSessionId != null) {
-            httpToWebSocketSessionMapping.put(httpSessionId, webSocketSessionId);
-            log.info("✅ Session mapping created: HTTP={} -> WS={}", httpSessionId, webSocketSessionId);
+        if (userId != null) {
+            userIdToWebSocketSessionMapping.put(userId, webSocketSessionId);
+            log.info("✅ Session mapping created: USER={} -> WS={}", userId, webSocketSessionId);
         } else {
-            log.warn("❌ Could not extract HTTP session ID from URI: {}", session.getUri());
+            log.warn("❌ Could not extract USER ID from URI: {}", session.getUri());
         }
     }
     
@@ -50,51 +50,62 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
         sessions.remove(webSocketSessionId);
         
         // 역방향 매핑도 제거
-        httpToWebSocketSessionMapping.entrySet().removeIf(entry -> 
+        userIdToWebSocketSessionMapping.entrySet().removeIf(entry ->
             entry.getValue().equals(webSocketSessionId));
         
         log.info("WebSocket connection closed: {}", webSocketSessionId);
     }
     
     /**
-     * 특정 세션에 진행률 전송 - HTTP 세션 ID 기반
+     * 특정 세션에 진행률 전송 - 사용자 ID 기반
+     * WebSocket 동시성 문제 해결을 위한 동기화 처리
      */
-    public void sendProgress(String httpSessionId, DownloadProgress progress) {
-        String webSocketSessionId = httpToWebSocketSessionMapping.get(httpSessionId);
+    public synchronized void sendProgress(String userId, DownloadProgress progress) {
+        String webSocketSessionId = userIdToWebSocketSessionMapping.get(userId);
         if (webSocketSessionId != null) {
             WebSocketSession session = sessions.get(webSocketSessionId);
             if (session != null && session.isOpen()) {
                 try {
                     String message = objectMapper.writeValueAsString(progress);
-                    session.sendMessage(new TextMessage(message));
-                    log.debug("✅ Progress sent to session {}: {}%", httpSessionId, progress.getProgressPercentage());
+                    synchronized (session) {
+                        session.sendMessage(new TextMessage(message));
+                    }
+                    log.debug("✅ Progress sent to session {}: {}%", userId, progress.getProgressPercentage());
                 } catch (IOException e) {
-                    log.error("Failed to send progress to session: {}", httpSessionId, e);
+                    log.error("Failed to send progress to session: {}", userId, e);
                     sessions.remove(webSocketSessionId);
-                    httpToWebSocketSessionMapping.remove(httpSessionId);
+                    userIdToWebSocketSessionMapping.remove(userId);
+                } catch (Exception e) {
+                    log.error("WebSocket state error for session {}: {}", userId, e.getMessage());
+                    // WebSocket 상태 오류 발생 시 메시지 미전송
+//                    broadcastProgressSafe(progress);
                 }
             }
         } else {
-            log.warn("❌ No WebSocket session found for HTTP session: {} (connected sessions: {})", 
-                httpSessionId, sessions.size());
+            log.warn("❌ No WebSocket session found for userId: {} (connected sessions: {})",
+                    userId, sessions.size());
             
-            // 임시 대안: 브로드캐스트하되 requestId로 클라이언트에서 필터링하도록 함
+            // 대안: 안전한 브로드캐스트
             log.info("🔄 Falling back to broadcast for requestId: {}", progress.getRequestId());
-            broadcastProgress(progress);
+            broadcastProgressSafe(progress);
         }
     }
     
     /**
-     * 모든 활성 세션에 메시지 브로드캐스트
+     * 모든 활성 세션에 메시지 브로드캐스트 (안전한 버전)
      */
-    public void broadcastProgress(DownloadProgress progress) {
+    public synchronized void broadcastProgressSafe(DownloadProgress progress) {
         sessions.values().parallelStream()
                 .filter(WebSocketSession::isOpen)
                 .forEach(session -> {
                     try {
-                        String message = objectMapper.writeValueAsString(progress);
-                        session.sendMessage(new TextMessage(message));
-                    } catch (IOException e) {
+                        synchronized (session) {
+                            if (session.isOpen()) {
+                                String message = objectMapper.writeValueAsString(progress);
+                                session.sendMessage(new TextMessage(message));
+                            }
+                        }
+                    } catch (Exception e) {
                         log.error("Failed to broadcast to session: {}", session.getId(), e);
                         sessions.remove(session.getId());
                     }
@@ -102,23 +113,30 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
     }
     
     /**
-     * URL 쿼리 파라미터에서 HTTP 세션 ID 추출
+     * 모든 활성 세션에 메시지 브로드캐스트 (기존 버전 - 호환성용)
      */
-    private String extractHttpSessionId(WebSocketSession session) {
+    public void broadcastProgress(DownloadProgress progress) {
+        broadcastProgressSafe(progress);
+    }
+    
+    /**
+     * URL 쿼리 파라미터에서 사용자 ID 추출
+     */
+    private String extractUserId(WebSocketSession session) {
         try {
             String query = session.getUri().getQuery();
-            if (query != null && query.contains("sessionId=")) {
+            if (query != null && query.contains("userId=")) {
                 String[] queryParts = query.split("&");
                 for (String part : queryParts) {
-                    if (part.startsWith("sessionId=")) {
-                        String sessionId = part.substring("sessionId=".length());
-                        return URLDecoder.decode(sessionId, StandardCharsets.UTF_8);
+                    if (part.startsWith("userId=")) {
+                        String userId = part.substring("userId=".length());
+                        return URLDecoder.decode(userId, StandardCharsets.UTF_8);
                     }
                 }
             }
             return null;
         } catch (Exception e) {
-            log.error("Error extracting HTTP session ID from WebSocket session", e);
+            log.error("Error extracting User ID from WebSocket session", e);
             return null;
         }
     }

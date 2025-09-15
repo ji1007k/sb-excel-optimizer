@@ -5,6 +5,7 @@ import com.performance.excel.service.DownloadQueue;
 import com.performance.excel.service.ExcelDownloadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -12,7 +13,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpSession;
 import java.io.File;
 import java.util.Map;
 import java.util.UUID;
@@ -25,19 +25,53 @@ public class DownloadController {
     
     private final ExcelDownloadService excelDownloadService;
     
+    @Value("${excel.download.directory:downloads/}")
+    private String downloadDirectory;
+
+
+    /**
+     * 페이징 방식 Excel 다운로드 (기존 방식 - 비교용)
+     */
+    @PostMapping("/excel/paging")
+    public ResponseEntity<Map<String, String>> downloadExcelPaging(
+            @RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        String requestId = UUID.randomUUID().toString();
+        String finalUserId = userId;
+
+        log.info("Paging download requested - HTTP Session: {}, Request: {}", finalUserId, requestId);
+
+        try {
+            String downloadRequestId = excelDownloadService.requestDownload(
+                    DownloadRequest.DownloadType.PAGING, finalUserId, requestId);
+
+            return ResponseEntity.ok(Map.of(
+                    "requestId", downloadRequestId,
+                    "message", "페이징 다운로드 요청이 큐에 추가되었습니다.",
+                    "type", "PAGING"
+            ));
+        } catch (Exception e) {
+            log.error("Paging download request failed: {}", requestId, e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
+        }
+    }
+    
     /**
      * 스트리밍 방식 Excel 다운로드 (메모리 최적화)
      */
     @PostMapping("/excel/streaming")
-    public ResponseEntity<Map<String, String>> downloadExcelStreaming(HttpSession session) {
+    public ResponseEntity<Map<String, String>> downloadExcelStreaming(
+            @RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
         String requestId = UUID.randomUUID().toString();
-        String sessionId = session.getId();
-        
-        log.info("Streaming download requested - Session: {}, Request: {}", sessionId, requestId);
+        String finalUserId = userId;
+
+        log.info("Streaming download requested - HTTP Session: {}, Request: {}", finalUserId, requestId);
         
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.STREAMING, sessionId, requestId);
+                    DownloadRequest.DownloadType.STREAMING, finalUserId, requestId);
             
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
@@ -52,44 +86,20 @@ public class DownloadController {
     }
     
     /**
-     * 페이징 방식 Excel 다운로드 (기존 방식 - 비교용)
-     */
-    @PostMapping("/excel/paging")
-    public ResponseEntity<Map<String, String>> downloadExcelPaging(HttpSession session) {
-        String requestId = UUID.randomUUID().toString();
-        String sessionId = session.getId();
-        
-        log.info("Paging download requested - Session: {}, Request: {}", sessionId, requestId);
-        
-        try {
-            String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.PAGING, sessionId, requestId);
-            
-            return ResponseEntity.ok(Map.of(
-                    "requestId", downloadRequestId,
-                    "message", "페이징 다운로드 요청이 큐에 추가되었습니다.",
-                    "type", "PAGING"
-            ));
-        } catch (Exception e) {
-            log.error("Paging download request failed: {}", requestId, e);
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
-        }
-    }
-    
-    /**
      * FastExcel 방식 다운로드 (향후 구현)
      */
     @PostMapping("/excel/fast")
-    public ResponseEntity<Map<String, String>> downloadExcelFast(HttpSession session) {
+    public ResponseEntity<Map<String, String>> downloadExcelFast(
+            @RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
         String requestId = UUID.randomUUID().toString();
-        String sessionId = session.getId();
+        String finalUserId = userId;
         
-        log.info("FastExcel download requested - Session: {}, Request: {}", sessionId, requestId);
+        log.info("FastExcel download requested - Session: {}, Request: {}", finalUserId, requestId);
         
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.FAST_EXCEL, sessionId, requestId);
+                    DownloadRequest.DownloadType.FAST_EXCEL, finalUserId, requestId);
             
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
@@ -114,7 +124,7 @@ public class DownloadController {
                 return ResponseEntity.badRequest().build();
             }
             
-            File file = new File("downloads/" + fileName);
+            File file = new File(getDownloadPath() + fileName);
             if (!file.exists()) {
                 return ResponseEntity.notFound().build();
             }
@@ -155,5 +165,17 @@ public class DownloadController {
                 && !fileName.contains("..")
                 && !fileName.contains("/")
                 && !fileName.contains("\\");
+    }
+    
+    /**
+     * 다운로드 경로 반환
+     */
+    private String getDownloadPath() {
+        if (!downloadDirectory.startsWith("/") && !downloadDirectory.contains(":")) {
+            String currentDir = System.getProperty("user.dir");
+            String fullPath = currentDir + File.separator + downloadDirectory;
+            return fullPath.endsWith(File.separator) ? fullPath : fullPath + File.separator;
+        }
+        return downloadDirectory;
     }
 }
