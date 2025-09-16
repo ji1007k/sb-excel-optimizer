@@ -37,12 +37,38 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
     
     // Database drivers
-    runtimeOnly 'com.h2database:h2'  // 테스트용
     runtimeOnly 'org.postgresql:postgresql'  // 개발/운영용
-    
+
+    // test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
 test {
     useJUnitPlatform()
+    
+    // 성능 테스트를 위한 JVM 옵션
+    jvmArgs = [
+        '-Xmx1g',           // 힙 메모리 1GB
+        '-Xms500m',         // 초기 힙 메모리 500mb
+        '-XX:+UseG1GC',     // G1 가비지 컬렉터 사용
+        '-XX:MaxGCPauseMillis=200',  // 최대 GC 일시정지 시간
+
+        // GC 로그 설정 (Java 17 버전)
+        '-Xlog:gc:build/gc-test.log:time,level,tags'
+    ]
+    
+    // 테스트 실행 시간 제한 (30분)
+    timeout = Duration.ofMinutes(30)
+    
+    // 테스트 병렬 실행 방지 (성능 테스트 정확성을 위해)
+    maxParallelForks = 1
+    
+    // 테스트 결과 상세 출력
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = false
+    }
 }

@@ -1,162 +1,164 @@
-# Excel Download Performance Optimizer
+# Excel 대용량 다운로드 최적화 프로젝트
 
-## 🔥 실무 문제 해결 스토리
+## 프로젝트 개요
 
-### 당시 상황 (2023년 사내 시연)
-- 👥 **20명의 동료들** 앞에서 시연 중
-- 📊 **모든 사용자가 동시에** Excel 다운로드 테스트
-- 💥 **OutOfMemoryError** 발생 → **서버 완전 다운**
-- 😰 **개발서버에서 시연 마무리**해야 하는 상황
+### 문제 상황
+- **실무 경험**: 이전 회사에서 Excel 다운로드 기능 시연 중 20건 동시 요청으로 OOM 발생
+- **증상**: FULL GC로 인한 STW(Stop The World) 현상, 다운로드 파일 손상
+- **원인**: XSSF의 전체 DOM 메모리 로딩 + 대용량 데이터 일괄 조회
 
-### 1차 해결 시도 → 한계 인식
-- **GC 튜닝**: CMS GC 적용, 로그 로테이션 설정
-- **라이브러리 교체**: XSSF → SXSSF (1000행 메모리 제한)
-- **결과**: 일반 부하는 개선되었으나, **동시성 문제는 미해결**
+### 해결 목표
+- OOM 방지로 안정적인 대용량 Excel 다운로드
+- 동시 요청 처리 제한 적용
 
-### 최종 해결 (이 프로젝트)
-- **동시성 제어**: 최대 3개까지만 동시 처리, 나머지는 큐 대기
-- **진정한 스트리밍**: 메모리에 데이터 축적 없이 즉시 처리
-- **실시간 피드백**: WebSocket으로 진행률 제공하여 중복 요청 방지
-- **결과**: 20명 동시 요청에도 **서버 안정성 100% 확보**
+## 개선 과정
 
-## 🎯 핵심 기술 성과
+### 1차: 실무 조치 사항
+```
+XSSF + 전체 SELECT → SXSSF + 1000건 페이징
+```
+- **XSSF → SXSSF**: 스트리밍 방식으로 메모리 사용량 감소
+- **전체 조회 → 페이징**: ROWNUM으로 1000건씩 분할 처리
+- **결과**: 20건 동시 요청 OOM 해결 및 FULL GC 미발생
 
-### 메모리 사용량 최적화
-- **Before**: 데이터 크기에 비례 증가 (10만건 = 2.5GB)
-- **After**: 일정하게 유지 (10만건 = 50MB)
-- **개선률**: **98% 메모리 사용량 감소**
+### 2차: 성능 최적화 (포트폴리오)
+```
+ROWNUM 페이징 → ID 기반 커서 페이징
+```
+- **문제**: ROWNUM의 COUNT(*) 연산 오버헤드
+- **해결**: `WHERE id > ? ORDER BY id LIMIT 1000` 방식
+- **효과**: 쿼리 성능 향상, 인덱스 활용도 증가
 
-### 동시성 제어
-- **Before**: 무제한 동시 처리 → 서버 다운
-- **After**: 큐 시스템으로 안정적 제어
-- **결과**: **20개 요청 → 3개 처리 + 17개 대기**
+### 3차: 동시성 제어 (포트폴리오)
+```
+무제한 동시 처리 → 블로킹큐 + 동시 처리수 제한
+```
+- **BlockingQueue 도입**: 요청 대기열 관리
+- **동시 처리수 제한**: 3개까지만 동시 처리
+- **효과**: 시스템 안정성 확보, 메모리 사용량 예측 가능
 
-### 사용자 경험
-- **Before**: 진행상황 불투명 → 중복 요청 → 서버 부하 악화
-- **After**: 실시간 진행률 → 중복 요청 방지
-- **결과**: **사용자 만족도 및 서버 안정성 동시 확보**
+### 4차: 라이브러리 최적화 (TODO)
+```
+Apache POI → FastExcel 라이브러리
+```
+- 더 나은 메모리 효율성과 쓰기 성능 기대
 
-## 🚀 기술 스택
+## 성능 개선 결과
 
-- **Backend**: Spring Boot 3.2, Java 17
-- **동시성 제어**: BlockingQueue, ConcurrentHashMap  
-- **Excel 처리**: Apache POI SXSSFWorkbook, FastExcel
-- **실시간 통신**: Spring WebSocket
-- **성능 모니터링**: JVM Memory Monitoring, Custom Metrics
-- **테스트**: 대용량 데이터 생성, 동시성 스트레스 테스트
+### Before (1차 이전)
+- **동시 요청 한계**: 20건에서 OOM 발생
+- **메모리 사용**: 전체 데이터를 메모리에 로딩
+- **안정성**: FULL GC로 인한 서비스 중단
 
-## 📈 성능 테스트 결과
+### After (3차 완료)
+- **동시 요청 처리**: 큐 대기 방식으로 안정적 처리
+- **메모리 사용**: 청크 단위 처리로 일정한 메모리 사용
+- **안정성**: OOM 없는 안정적 서비스
 
-### 동시 다운로드 스트레스 테스트
-```bash
-# 20명 동시 다운로드 시뮬레이션
-./stress-test/20-users-simulation.sh
+## 아키텍처 설계
 
-결과:
-✅ 서버 다운: 0회
-✅ 메모리 오버플로우: 0회  
-✅ 평균 대기시간: 3분 20초
-✅ 최대 동시 처리: 3개 (설정값)
-✅ 큐 대기: 평균 17개
+### 블로킹큐 기반 동시성 제어
+```java
+@Service
+public class ExcelDownloadService {
+    private final BlockingQueue<DownloadRequest> downloadQueue;
+    private final ThreadPoolExecutor executor;
+    
+    // 최대 3개까지만 동시 처리
+    private static final int MAX_CONCURRENT_DOWNLOADS = 3;
+}
 ```
 
-### 메모리 사용량 비교 (100만건 기준)
-```
-기존 방식: 25GB RAM 사용 → OOM Error
-스트리밍: 55MB RAM 사용 → 안정적 처리
-FastExcel: 35MB RAM 사용 → 최고 성능
-```
+### ID 기반 커서 페이징
+```sql
+-- 기존: ROWNUM 방식 (PK 인덱스 비활용)
+SELECT * FROM (
+    SELECT ROWNUM rn, t.* FROM table t ORDER BY id
+) WHERE rn BETWEEN ? AND ?
 
-## 🎬 시연 방법
-
-### 1단계: 애플리케이션 실행
-```bash
-./gradlew bootRun
-```
-
-### 2단계: 대용량 테스트 데이터 준비
-```bash
-curl -X POST "http://localhost:8081/api/test-data/generate?count=100000"
+-- 개선: ID 커서 방식 (PK 인덱스 활용 + 스킵 스캔)
+SELECT * FROM table 
+WHERE id > ? 
+ORDER BY id 
+LIMIT 1000
 ```
 
-### 3단계: 동시 다운로드 테스트 (20개 요청)
-```bash
-./stress-test/concurrent-download-test.sh
+### 전략 패턴 적용
+```java
+// 다양한 Excel 생성 전략을 추상화
+public interface ExcelDownloadStrategy {
+    String generateExcel(String userId, String requestId);
+}
+
+// 1. 기존 방식 (비교 목적)
+class OldWayExcelStrategy implements ExcelDownloadStrategy
+
+// 2. 페이징 방식  
+class PagingExcelStrategy implements ExcelDownloadStrategy
+
+// 3. 스트리밍 + 큐 방식
+class StreamingExcelStrategy implements ExcelDownloadStrategy
 ```
 
-### 4단계: 실시간 모니터링
-- 메모리 사용량: `./stress-test/memory-monitor.sh`
-- WebSocket 진행률: 브라우저 개발자 도구
-- 큐 상태: `curl http://localhost:8081/api/download/queue/status`
+## 🧪 성능 테스트 설계
 
-## 📊 API 엔드포인트
+### 테스트 시나리오
+1. **단일 전략 성능 측정**: 처리 시간, 메모리 사용량
+2. **전략별 비교 테스트**: OLD_WAY vs 페이징 vs 스트리밍
+3. **동시성 테스트**: 5건 동시 요청 시 OOM 발생 여부
+4. **처리량 테스트**: 60초간 처리 가능한 요청 수
 
-### 테스트 데이터 관리
-```bash
-# 테스트 데이터 생성
-POST /api/test-data/generate?count=10000
+### 측정 지표
+- **처리 시간**: 요청부터 파일 생성까지 소요 시간
+- **메모리 사용량**: 힙 메모리 사용량 변화
+- **처리량**: 단위 시간당 처리 요청 수
+- **안정성**: OOM 발생 여부
 
-# 데이터 개수 조회
-GET /api/test-data/count
+## 핵심 학습 포인트
 
-# 전체 데이터 삭제
-DELETE /api/test-data/clear
+### 1. 실무 문제 해결 경험
+- 실제 운영 환경에서 발생한 OOM 문제 해결
+- 단계적 접근으로 안정성 확보 후 성능 최적화
+
+### 2. 메모리 관리
+- JVM 힙 메모리 특성 이해
+- 스트리밍 처리로 메모리 사용량 제어
+
+### 3. 동시성 제어
+- BlockingQueue를 활용한 백프레셀 구현
+- 시스템 리소스 보호를 위한 처리량 제한
+
+### 4. 데이터베이스 최적화
+- 페이징 쿼리 성능 최적화
+- 인덱스 활용을 고려한 커서 기반 페이징
+
+### 5. 아키텍처 설계
+- 전략 패턴으로 다양한 구현체 교체 가능
+- 확장성과 유지보수성을 고려한 구조
+
+## 향후 개선 계획
+
+1. **외부 메시지큐 도입**: Redis/RabbitMQ로 큐 영속성 확보
+2. **FastExcel 라이브러리 적용**: POI보다 더 나은 성능과 메모리 효율성
+3. **모니터링 강화**: 실시간 메트릭 수집 및 알림
+
+## 프로젝트 구조
+
 ```
-
-### Excel 다운로드
-```bash
-# 스트리밍 방식 (메모리 최적화)
-POST /api/download/excel/streaming
-
-# 페이징 방식 (기존 방식 - 비교용)
-POST /api/download/excel/paging
-
-# FastExcel 방식 (고성능)
-POST /api/download/excel/fast
-
-# 큐 상태 조회
-GET /api/download/queue/status
-
-# 파일 다운로드
-GET /api/download/file/{fileName}
+excel-optimizer/
+├── src/main/java/com/performance/excel/
+│   ├── strategy/           # 전략 패턴 구현
+│   ├── service/           # 비즈니스 로직
+│   ├── util/              # 유틸리티 클래스
+│   └── ExcelOptimizerApplication.java
+├── src/test/java/
+│   └── service/
+│       ├── StrategyComparisonTest.java    # 전략별 성능 비교
+│       └── BasicPerformanceTest.java      # 기본 성능 테스트
+└── docs/
+    └── MEMORY_OPTIMIZATION_GUIDE.md      # 메모리 최적화 가이드
 ```
-
-### WebSocket (실시간 진행률)
-```javascript
-// 연결
-const ws = new WebSocket('ws://localhost:8081/ws/download-progress?sessionId=your-session-id');
-
-// 메시지 수신
-ws.onmessage = (event) => {
-    const progress = JSON.parse(event.data);
-    console.log(`진행률: ${progress.progressPercentage}%`);
-};
-```
-
-## 🎯 면접 어필 포인트
-
-### 1. 실무 경험 기반 문제 해결
-> "실제로 20명 앞에서 시연 중 서버가 다운된 경험을 바탕으로, 동시성 제어의 중요성을 체감했습니다."
-
-### 2. 근본 원인 분석 능력  
-> "처음에는 단순한 메모리 문제로 생각했지만, 학습을 통해 동시성이 핵심 문제임을 깨달았습니다."
-
-### 3. 확장 가능한 아키텍처
-> "내부 시스템이라 사용자가 적었지만, 실제 서비스 환경을 고려해 확장 가능하게 설계했습니다."
-
-### 4. 성능과 안정성의 균형
-> "단순히 빠르게만 만드는 것이 아니라, 서버 안정성과 사용자 경험을 모두 고려했습니다."
-
-## 🔧 환경 요구사항
-
-- Java 17+
-- Gradle 8.0+
-- Memory: 최소 512MB (대용량 테스트 시 2GB 권장)
-
-## 📝 프로젝트 배경
-
-이 프로젝트는 별도의 이커머스 시스템과 함께 구성된 포트폴리오의 일부입니다. 이커머스 시스템에서는 일반적인 백엔드 개발 역량을, 이 프로젝트에서는 **성능 최적화와 동시성 제어**에 특화된 기술 역량을 보여줍니다.
 
 ---
 
-**"실무에서 겪은 진짜 문제를 진짜 기술로 해결한 프로젝트"**
+이 프로젝트는 **실무에서 겪은 실제 문제를 해결하고, 이를 더 발전시킨 포트폴리오**입니다. 단순한 기능 구현이 아닌, **문제 분석 → 해결 → 최적화**의 전 과정을 담고 있습니다.

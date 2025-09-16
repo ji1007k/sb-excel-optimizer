@@ -128,7 +128,7 @@
                 // WebSocket 연결
                 connectWebSocket(currentUserId);
             } catch (error) {
-                addLog(`❌ 사용자 초기화 실패: ${error.message}`);
+                addLog(`사용자 초기화 실패: ${error.message}`);
             }
         }
         
@@ -138,7 +138,7 @@
             
             websocket.onopen = function() {
                 updateWSStatus(true);
-                addLog('✅ WebSocket 연결됨 - 사용자 ID: ' + currentUserId.substring(0, 8) + '...');
+                addLog('WebSocket 연결됨 - 사용자 ID: ' + currentUserId.substring(0, 8) + '...');
             };
             
             websocket.onmessage = function(event) {
@@ -148,7 +148,7 @@
             
             websocket.onclose = function() {
                 updateWSStatus(false);
-                addLog('❌ WebSocket 연결 끊김');
+                addLog('WebSocket 연결 끊김');
                 setTimeout(() => connectWebSocket(currentUserId), 3000);
             };
 
@@ -202,8 +202,8 @@
             const statusMap = {
                 'QUEUED': '🕐 대기 중',
                 'PROCESSING': '⚡ 처리 중',
-                'COMPLETED': '✅ 완료',
-                'FAILED': '❌ 실패'
+                'COMPLETED': '완료',
+                'FAILED': '실패'
             };
             return statusMap[status] || status;
         }
@@ -216,10 +216,10 @@
                     method: 'POST'
                 });
                 const result = await response.json();
-                addLog(`✅ 테스트 데이터 생성 완료: ${result.generatedCount}건`);
+                addLog(`테스트 데이터 생성 완료: ${result.generatedCount}건`);
                 getDataCount();
             } catch (error) {
-                addLog(`❌ 테스트 데이터 생성 실패: ${error.message}`);
+                addLog(`테스트 데이터 생성 실패: ${error.message}`);
             }
         }
         
@@ -229,9 +229,9 @@
                 const response = await fetch('/api/test-data/count');
                 const result = await response.json();
                 document.getElementById('dataCount').textContent = result.totalCount.toLocaleString();
-                addLog(`📊 현재 데이터 개수: ${result.totalCount.toLocaleString()}건`);
+                addLog(`현재 데이터 개수: ${result.totalCount.toLocaleString()}건`);
             } catch (error) {
-                addLog(`❌ 데이터 개수 조회 실패: ${error.message}`);
+                addLog(`데이터 개수 조회 실패: ${error.message}`);
             }
         }
         
@@ -243,10 +243,10 @@
                         method: 'DELETE'
                     });
                     const result = await response.json();
-                    addLog(`🗑️ 데이터 삭제 완료: ${result.message}`);
+                    addLog(`데이터 삭제 완료: ${result.message}`);
                     getDataCount();
                 } catch (error) {
-                    addLog(`❌ 데이터 삭제 실패: ${error.message}`);
+                    addLog(`데이터 삭제 실패: ${error.message}`);
                 }
             }
         }
@@ -269,10 +269,10 @@
                     }
                 });
                 const result = await response.json();
-                addLog(`✅ 다운로드 요청 성공: ${result.requestId}`);
+                addLog(`다운로드 요청 성공: ${result.requestId}`);
                 getQueueStatus();
             } catch (error) {
-                addLog(`❌ 다운로드 요청 실패: ${error.message}`);
+                addLog(`다운로드 요청 실패: ${error.message}`);
             }
         }
         
@@ -286,9 +286,9 @@
                 document.getElementById('queueSize').textContent = status.queueSize;
                 document.getElementById('maxConcurrent').textContent = status.maxConcurrentDownloads;
                 
-                addLog(`📋 큐 상태: 처리중 ${status.processingCount}개, 대기중 ${status.queueSize}개`);
+                addLog(`큐 상태: 처리중 ${status.processingCount}개, 대기중 ${status.queueSize}개`);
             } catch (error) {
-                addLog(`❌ 큐 상태 조회 실패: ${error.message}`);
+                addLog(`큐 상태 조회 실패: ${error.message}`);
             }
         }
         
@@ -320,11 +320,11 @@
             // 모든 요청 완료 대기
             try {
                 await Promise.all(promises);
-                addLog('✅ 20명 동시 요청 모두 완료!');
-                addLog('📊 결과: 서버 다운 없음, 안정적 큐 처리 확인');
+                addLog('20명 동시 요청 모두 완료!');
+                addLog('결과: 서버 다운 없음, 안정적 큐 처리 확인');
                 getQueueStatus();
             } catch (error) {
-                addLog(`❌ 시뮬레이션 중 오류: ${error.message}`);
+                addLog(`시뮬레이션 중 오류: ${error.message}`);
             }
         }
         

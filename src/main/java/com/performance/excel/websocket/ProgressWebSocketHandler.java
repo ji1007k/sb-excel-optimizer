@@ -38,9 +38,9 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
         
         if (userId != null) {
             userIdToWebSocketSessionMapping.put(userId, webSocketSessionId);
-            log.info("✅ Session mapping created: USER={} -> WS={}", userId, webSocketSessionId);
+            log.info("Session mapping created: USER={} -> WS={}", userId, webSocketSessionId);
         } else {
-            log.warn("❌ Could not extract USER ID from URI: {}", session.getUri());
+            log.warn("Could not extract USER ID from URI: {}", session.getUri());
         }
     }
     
@@ -70,7 +70,7 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
                     synchronized (session) {
                         session.sendMessage(new TextMessage(message));
                     }
-                    log.debug("✅ Progress sent to session {}: {}%", userId, progress.getProgressPercentage());
+                    log.debug("Progress sent to session {}: {}%", userId, progress.getProgressPercentage());
                 } catch (IOException e) {
                     log.error("Failed to send progress to session: {}", userId, e);
                     sessions.remove(webSocketSessionId);
@@ -82,11 +82,11 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
                 }
             }
         } else {
-            log.warn("❌ No WebSocket session found for userId: {} (connected sessions: {})",
+            log.warn("No WebSocket session found for userId: {} (connected sessions: {})",
                     userId, sessions.size());
             
             // 대안: 안전한 브로드캐스트
-            log.info("🔄 Falling back to broadcast for requestId: {}", progress.getRequestId());
+            log.info("Falling back to broadcast for requestId: {}", progress.getRequestId());
             broadcastProgressSafe(progress);
         }
     }

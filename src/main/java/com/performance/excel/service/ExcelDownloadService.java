@@ -55,15 +55,15 @@ public class ExcelDownloadService {
     }
 
     /**
-     * 당시 방식: 큐 없이 바로 처리! (동기 처리)
+     * 초기 구현 방식: 큐 없이 바로 처리! (동기 처리)
      */
     public String processOldWayDirectly(String userId, String requestId) {
-        log.warn("당시 방식 바로 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
+        log.info("초기 구현 방식 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
 
         try {
             DownloadRequest request = DownloadRequest.builder()
                     .requestId(requestId)
-                    .fileName("old_way_direct_" + requestId + ".xlsx")
+                    .fileName("basic_method_" + requestId + ".xlsx")
                     .downloadType(DownloadRequest.DownloadType.OLD_WAY)
                     .userId(userId)
                     .build();
@@ -74,8 +74,8 @@ public class ExcelDownloadService {
             return request.getFileName();
 
         } catch (Exception e) {
-            log.error("당시 방식 바로 처리 실패: {}", requestId, e);
-            throw new RuntimeException("당시 방식 처리 실패: " + e.getMessage(), e);
+            log.error("초기 구현 방식 처리 실패: {}", requestId, e);
+            throw new RuntimeException("초기 구현 방식 처리 실패: " + e.getMessage(), e);
         }
     }
 
@@ -83,12 +83,12 @@ public class ExcelDownloadService {
      * 페이징 방식: 큐 없이 바로 처리! (동기 처리)
      */
     public String processPagingDirectly(String userId, String requestId) {
-        log.info("Paging 방식 바로 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
+        log.info("페이징 방식 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
 
         try {
             DownloadRequest request = DownloadRequest.builder()
                     .requestId(requestId)
-                    .fileName("paging_direct_" + requestId + ".xlsx")
+                    .fileName("paging_method_" + requestId + ".xlsx")
                     .downloadType(DownloadRequest.DownloadType.PAGING)
                     .userId(userId)
                     .build();
@@ -99,8 +99,8 @@ public class ExcelDownloadService {
             return request.getFileName();
 
         } catch (Exception e) {
-            log.error("Paging 방식 바로 처리 실패: {}", requestId, e);
-            throw new RuntimeException("Paging 방식 처리 실패: " + e.getMessage(), e);
+            log.error("페이징 방식 처리 실패: {}", requestId, e);
+            throw new RuntimeException("페이징 방식 처리 실패: " + e.getMessage(), e);
         }
     }
 

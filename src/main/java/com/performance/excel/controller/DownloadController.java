@@ -30,7 +30,7 @@ public class DownloadController {
 
 
     /**
-     * 당시 진짜 문제 방식 Excel 다운로드 (동기 처리 - 완성까지 기다려야 함!)
+     * 초기 구현 방식 Excel 다운로드 (동기 처리 - 완성까지 기다려야 함!)
      */
     @PostMapping("/excel/old-way")
     public ResponseEntity<Resource> downloadExcelOldWay(
@@ -39,7 +39,7 @@ public class DownloadController {
         String requestId = UUID.randomUUID().toString();
         String finalUserId = userId;
 
-        log.warn("당시 진짜 문제 방식 - 동기 처리로 완성까지 기다려야 함! 사용자: {}", finalUserId);
+        log.warn("초기 구현 방식 - 동기 처리로 완성까지 기다려야 함! 사용자: {}", finalUserId);
 
         try {
             // 서비스에서 파일명만 받아옴
@@ -59,7 +59,7 @@ public class DownloadController {
                     .body(resource);
             
         } catch (Exception e) {
-            log.error("당시 방식 다운로드 실패: {}", requestId, e);
+            log.error("초기 구현 방식 다운로드 실패: {}", requestId, e);
             return ResponseEntity.internalServerError().build();
         }
     }
