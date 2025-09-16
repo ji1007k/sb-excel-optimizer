@@ -65,10 +65,10 @@ public class DownloadController {
     }
     
     /**
-     * 페이징 방식 Excel 다운로드 (기존 방식 - 비교용)
+     * 페이징 방식 Excel 다운로드 (큐 사용 안함 - 동기 처리)
      */
     @PostMapping("/excel/paging")
-    public ResponseEntity<Map<String, String>> downloadExcelPaging(
+    public ResponseEntity<Resource> downloadExcelPaging(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
@@ -77,18 +77,25 @@ public class DownloadController {
         log.info("Paging download requested - HTTP Session: {}, Request: {}", finalUserId, requestId);
 
         try {
-            String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.PAGING, finalUserId, requestId);
-
-            return ResponseEntity.ok(Map.of(
-                    "requestId", downloadRequestId,
-                    "message", "페이징 다운로드 요청이 큐에 추가되었습니다.",
-                    "type", "PAGING"
-            ));
+            // 서비스에서 파일명만 받아옴 (동기 처리)
+            String fileName = excelDownloadService.processPagingDirectly(finalUserId, requestId);
+            
+            // Controller에서 HTTP 응답 처리
+            File file = new File(getDownloadPath() + fileName);
+            if (!file.exists()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Resource resource = new FileSystemResource(file);
+            
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(resource);
+            
         } catch (Exception e) {
-            log.error("Paging download request failed: {}", requestId, e);
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
+            log.error("Paging download failed: {}", requestId, e);
+            return ResponseEntity.internalServerError().build();
         }
     }
     
