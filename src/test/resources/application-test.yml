@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ec_db
+    driver-class-name: org.postgresql.Driver
+    username: ec_user
+    password: ec_pwd
+    
+  jpa:
+    hibernate:
+      ddl-auto: none  # 기존 데이터 유지
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+logging:
+  level:
+    com.performance.excel: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+    root: WARN
+
+excel:
+  download:
+    directory: test-downloads/
+    max-queue-size: 1000
+    thread-pool-size: 10
