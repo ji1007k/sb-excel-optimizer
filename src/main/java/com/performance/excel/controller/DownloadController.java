@@ -39,7 +39,7 @@ public class DownloadController {
         String requestId = UUID.randomUUID().toString();
         String finalUserId = userId;
 
-        log.warn("💥 당시 진짜 문제 방식 - 동기 처리로 완성까지 기다려야 함! 사용자: {}", finalUserId);
+        log.warn("당시 진짜 문제 방식 - 동기 처리로 완성까지 기다려야 함! 사용자: {}", finalUserId);
 
         try {
             // 서비스에서 파일명만 받아옴

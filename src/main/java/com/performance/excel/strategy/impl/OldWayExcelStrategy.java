@@ -25,7 +25,7 @@ public class OldWayExcelStrategy implements ExcelDownloadStrategy {
     
     @Override
     public void process(DownloadRequest request, ExcelContext context) {
-        log.warn("💥 당시 문제 방식 처리: {}", request.getRequestId());
+        log.warn("당시 문제 방식 처리: {}", request.getRequestId());
         
         // 전체 데이터 한번에 조회 (문제!)
         List<TestData> allData = context.getTestDataRepository().findAll();

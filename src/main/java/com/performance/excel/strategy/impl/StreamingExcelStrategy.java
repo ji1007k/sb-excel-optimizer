@@ -30,7 +30,7 @@ public class StreamingExcelStrategy implements ExcelDownloadStrategy {
         long totalCount = context.getTestDataRepository().getTotalCount();
         String filePath = excelBuilder.getDownloadPath(context.getDownloadDirectory(), request.getFileName());
 
-        log.info("📄 파일 저장 예정 경로: {}", filePath);
+        log.info("파일 저장 예정 경로: {}", filePath);
 
         try {
             // JDBC ResultSet 기반 스트리밍으로 엑셀 직접 생성

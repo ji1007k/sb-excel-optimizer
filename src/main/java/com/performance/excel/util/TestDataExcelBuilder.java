@@ -147,13 +147,13 @@ public class TestDataExcelBuilder {
         File parentDir = file.getParentFile();
         if (parentDir != null && !parentDir.exists()) {
             boolean created = parentDir.mkdirs();
-            log.info("📁 Directory created: {} (success: {})", parentDir.getAbsolutePath(), created);
+            log.info("Directory created: {} (success: {})", parentDir.getAbsolutePath(), created);
         }
         
         // 파일 저장
         try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
             workbook.write(fileOut);
-            log.info("📄 Excel file saved to: {}", filePath);
+            log.info("Excel file saved to: {}", filePath);
         }
         
         // SXSSF인 경우 임시 파일 정리
@@ -180,7 +180,7 @@ public class TestDataExcelBuilder {
         File dir = new File(finalPath);
         if (!dir.exists()) {
             boolean created = dir.mkdirs();
-            log.info("📁 Download directory created: {} (success: {})", finalPath, created);
+            log.info("Download directory created: {} (success: {})", finalPath, created);
         }
         
         String dirPath = finalPath.endsWith(File.separator) ? finalPath : finalPath + File.separator;

@@ -58,7 +58,7 @@ public class ExcelDownloadService {
      * 당시 방식: 큐 없이 바로 처리! (동기 처리)
      */
     public String processOldWayDirectly(String userId, String requestId) {
-        log.warn("💥 당시 방식 바로 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
+        log.warn("당시 방식 바로 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
 
         try {
             DownloadRequest request = DownloadRequest.builder()
