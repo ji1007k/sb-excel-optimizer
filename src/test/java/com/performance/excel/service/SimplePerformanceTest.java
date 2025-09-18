@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 간단한 성능 비교 테스트
+ * - 처리속도(파일 다운로드 로직 처리 시간), 응답속도(클라 요청에 대한 서버 응답 소요 시간)
  * - 10만건 테스트 시 oldway가 더 빠를 수 있음.
  * - PAGING 방식에서 쿼리 오버헤드로 인해 더 느림.
  * - 단, OLDWAY 다중 요청으로 OOM 발생 시 FULL GC(STW)로 인한 소요시간 + 데이터 손실을 생각하면 PAGING 방식이 안정성 측면에서 더 좋음

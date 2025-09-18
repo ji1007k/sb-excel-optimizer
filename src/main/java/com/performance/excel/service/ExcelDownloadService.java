@@ -7,6 +7,7 @@ import com.performance.excel.strategy.ExcelContext;
 import com.performance.excel.strategy.ExcelDownloadStrategy;
 import com.performance.excel.websocket.ProgressWebSocketHandler;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class ExcelDownloadService {
 
     private final TestDataRepository testDataRepository;
+    @Getter
     private final DownloadQueue downloadQueue;
     private final ProgressWebSocketHandler progressWebSocketHandler;
     private final JdbcTemplate jdbcTemplate;
@@ -145,8 +147,15 @@ public class ExcelDownloadService {
             CompletableFuture.runAsync(() -> {
                 try {
                     processWithStrategy(request);
+                    // 성공 수 카운팅
+                    downloadQueue.markCompleted(request.getRequestId());
                 } catch (Exception e) {
                     log.error("Download processing failed: {}", request.getRequestId(), e);
+
+                    // 실패 수 카운팅
+                    downloadQueue.markFailed(request.getRequestId(), e.getMessage());
+
+                    // WebSocket으로 실패 알림
                     DownloadProgress failedProgress = DownloadProgress.failed(request.getRequestId(), e.getMessage());
                     try {
                         progressWebSocketHandler.sendProgress(request.getUserId(), failedProgress);
@@ -154,7 +163,6 @@ public class ExcelDownloadService {
                         log.warn("Failed to send failure progress: {}", wsException.getMessage());
                     }
                 } finally {
-                    downloadQueue.markCompleted(request.getRequestId());
                     // 다음 요청 처리
                     processQueue();
                 }
@@ -192,4 +200,5 @@ public class ExcelDownloadService {
     public DownloadQueue.QueueStatus getQueueStatus() {
         return downloadQueue.getQueueStatus();
     }
+
 }
