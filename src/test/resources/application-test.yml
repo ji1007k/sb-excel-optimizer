@@ -17,9 +17,12 @@ spring:
 logging:
   level:
     com.performance.excel: INFO
-    org.springframework.web: WARN
-    org.hibernate: WARN
-    root: WARN
+    com.performance.excel.service: INFO
+    com.performance.excel.websocket: ERROR
+    org.springframework.web: ERROR
+    org.springframework.web.socket: ERROR
+    org.hibernate: ERROR
+    root: ERROR
 
 excel:
   download:

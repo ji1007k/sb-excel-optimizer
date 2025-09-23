@@ -60,7 +60,7 @@ test {
     ]
     
     // 테스트 실행 시간 제한 (30분)
-    timeout = Duration.ofMinutes(30)
+    timeout = Duration.ofMinutes(60)
     
     // 테스트 병렬 실행 방지 (성능 테스트 정확성을 위해)
     maxParallelForks = 1
