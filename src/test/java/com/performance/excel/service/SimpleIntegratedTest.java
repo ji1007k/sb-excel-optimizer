@@ -1,7 +1,9 @@
 package com.performance.excel.service;
 
 import com.performance.excel.dto.DownloadRequest;
+import com.performance.excel.scheduler.ExcelTempCleanupScheduler;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +29,9 @@ class SimpleIntegratedTest {
 
     @Autowired
     private ExcelDownloadService excelDownloadService;
+
+    @Autowired
+    private ExcelTempCleanupScheduler cleanupScheduler;
 
     private final MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
 
@@ -61,6 +66,11 @@ class SimpleIntegratedTest {
                 log.error("❌ {} 실패: {}", method, fileName);
             }
         }
+    }
+
+    @AfterEach
+    void 임시파일_삭제() {
+        cleanupScheduler.cleanupAllForTest();
     }
 
     @Test

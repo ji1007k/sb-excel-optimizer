@@ -18,6 +18,7 @@ logging:
   level:
     com.performance.excel: INFO
     com.performance.excel.service: INFO
+    com.performance.excel.scheduler: INFO
     com.performance.excel.websocket: ERROR
     org.springframework.web: ERROR
     org.springframework.web.socket: ERROR
