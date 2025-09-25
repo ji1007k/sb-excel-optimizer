@@ -3,7 +3,7 @@
 > 실무에서 겪었던 OOM 문제를 해결한 경험에 동시성 제어와 성능 최적화를 더해
 > 대용량 엑셀 다운로드의 안정성과 처리 속도를 개선한 프로젝트
 >
-> [GitHub Repository 바로가기][1]
+> [GitHub Repository 바로가기](https://github.com/ji1007k/sb-excel-optimizer)
 
 ---
 
@@ -17,14 +17,14 @@
 
 ## 기술 스택
 
-- **Java 17**
-- **Spring Boot 3.2**
-- **Spring WebSocket**
-- **Spring Data JPA**
-- **PostgreSQL**
-- **Apache POI SXSSF**
-- **EasyExcel 3.3.2**
-- **FastExcel 0.19.0**
+- Java 17
+- Spring Boot 3.2
+- Spring WebSocket
+- Spring Data JPA
+- PostgreSQL
+- Apache POI SXSSF
+- EasyExcel 3.3.2
+- FastExcel 0.19.0
 
 ---
 
@@ -33,19 +33,19 @@
 ### 1차: 실무 조치 사항 (OOM 해결)
 
 - **목표**: 서비스 중단 원인 제거
-- **조치**: `XSSF` → `SXSSF` 스트리밍 + `1000건 페이징` 처리
+- **조치**: `XSSF` → `SXSSF` 스트리밍 + 1000건 페이징 처리
 - **결과**: OOM 및 Full GC 발생 없이 안정적 처리 가능
 
 ### 2차: 심화 최적화 (성능 + 안정성 강화)
 
 - **목표**: 성능 향상 및 사용자 경험 개선
-- **조치**: 비동기 처리 + ID 기반 커서 페이징 전환  (`WHERE id > ? ORDER BY id LIMIT ?`)
+- **조치**: 비동기 처리 + ID 기반 커서 페이징 (`WHERE id > ? ORDER BY id LIMIT ?`)
 - **결과**: 처리량 10배 향상, 즉시 응답 제공
 
 ### 3차: 라이브러리 성능 검증
 
 - **목표**: FastExcel, EasyExcel 성능 비교 검증
-- **테스트**: 50만행 기준 Apache POI vs EasyExcel vs FastExcel 비교
+- **테스트**: 50만행 기준 Apache POI vs EasyExcel vs FastExcel
 - **결과**: Apache POI SXSSF 대비 큰 성능 이점을 확인하지 못함
 - **선택**: 실측 데이터 기반으로 Apache POI SXSSF 유지 결정
 
@@ -54,33 +54,31 @@
 ## 성과
 
 ### 핵심 개선 지표
+
 - OOM 해결 (50만 행 안정 처리)
 - 메모리 사용량 97.8% 절감 (832MB → 18MB)
 - 처리량 10배 향상 (3.0개/분 → 32.3개/분)
 - 응답시간 즉시 제공 (19.1초 → 2ms)
 - 라이브러리 검증 완료 (실측 기반 선택)
 
-> [성능 최적화 결과 바로가기][2]
+> [성능 최적화 결과 바로가기](./docs/performance-test-results.md)
 
 ### 기술적 성취
-1. **실무 문제 해결**: 운영 중 발생한 OOM을 직접 해결하며 안정성 확보
-2. **성능 측정**: 벤치마크 대신 환경 테스트로 라이브러리 선택
-3. **메모리 관리**: JVM/GC 동작 이해를 통한 자원 활용
-4. **비동기 아키텍처 설계**: BlockingQueue 기반 동시성 제어 시스템 구현
-5. **쿼리 튜닝**: 커서 페이징 전환으로 DB 성능 향상
+
+1. 실무 문제 해결: 운영 중 발생한 OOM을 직접 해결하며 안정성 확보
+2. 성능 측정: 벤치마크 대신 환경 테스트로 라이브러리 선택
+3. 메모리 관리: JVM/GC 동작 이해를 통한 자원 활용
+4. 비동기 아키텍처 설계: BlockingQueue 기반 동시성 제어 시스템 구현
+5. 쿼리 튜닝: 커서 페이징 전환으로 DB 성능 향상
 
 ---
 
 ## 향후 개선 계획
 
-1. **분산 시스템 전환**: 다중 인스턴스 환경 지원
-    - 인메모리 상태 → Redis 기반 분산 상태 관리
-    - BlockingQueue → Redis Stream/RabbitMQ 기반 메시지 큐
-    - 로컬 동시성 제어 → Redis 분산 락 기반 글로벌 동시성 제어
+1. **분산 시스템 전환**: 다중 인스턴스 환경 지원으로 수평 확장 대비
+   - 인메모리 상태 → Redis 기반 분산 상태 관리
+   - BlockingQueue → Redis Stream/RabbitMQ 기반 메시지 큐
+   - 로컬 동시성 제어 → Redis 분산 락 기반 글로벌 동시성 제어
 
-
----
-
-[1]: https://github.com/ji1007k/sb-excel-optimizer
-[2]: ./docs/performance-test-results.md
-
+[//]: # (2. **압축**: 대용량 파일 zip 압축 적용)
+[//]: # (3. **스트리밍 다운로드**: 파일 완성 전 부분 다운로드 지원)
