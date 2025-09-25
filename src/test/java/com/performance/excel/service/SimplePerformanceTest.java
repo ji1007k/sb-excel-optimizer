@@ -163,12 +163,12 @@ class SimplePerformanceTest {
     void streaming_N회연속() {
         long iterationCount = 5;
 
-        log.info("=== STREAMING {}회 실행 ===", iterationCount);
+        log.info("=== ASYNC_QUEUE {}회 실행 ===", iterationCount);
 
         // 큐에 삽입
         for (int i=0; i<iterationCount; i++) {
             excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.STREAMING, "test", UUID.randomUUID().toString());
+                    DownloadRequest.DownloadType.ASYNC_QUEUE, "test", UUID.randomUUID().toString());
             
             log.info("...{}번째 요청 등록 완료", i+1);
         }
@@ -193,7 +193,7 @@ class SimplePerformanceTest {
         long endTime = System.currentTimeMillis();
         long time = endTime - startTime;
 //        1207ms ~ 3258ms
-        log.info("...STREAMING {}회 완료", iterationCount);
+        log.info("...ASYNC_QUEUE {}회 완료", iterationCount);
         log.info("...평균 소요시간: {}ms", time / iterationCount);
     }
 

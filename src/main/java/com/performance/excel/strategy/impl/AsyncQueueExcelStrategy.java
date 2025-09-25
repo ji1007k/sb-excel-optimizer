@@ -18,14 +18,20 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class StreamingExcelStrategy implements ExcelDownloadStrategy {
+public class AsyncQueueExcelStrategy implements ExcelDownloadStrategy {
 
     private final TestDataExcelBuilder excelBuilder;
     private static final int CHUNK_SIZE = 1000;
 
+
+    @Override
+    public DownloadRequest.DownloadType getSupportedType() {
+        return DownloadRequest.DownloadType.ASYNC_QUEUE;
+    }
+
     @Override
     public void process(DownloadRequest request, ExcelContext context) {
-        log.info("Processing with JDBC STREAMING method: {}", request.getRequestId());
+        log.info("Processing with JDBC ASYNC_QUEUE method: {}", request.getRequestId());
 
         long totalCount = context.getTestDataRepository().getTotalCount();
         String filePath = excelBuilder.getDownloadPath(context.getDownloadDirectory(), request.getFileName());
@@ -33,8 +39,8 @@ public class StreamingExcelStrategy implements ExcelDownloadStrategy {
         log.info("파일 저장 예정 경로: {}", filePath);
 
         try {
-            // JDBC ResultSet 기반 스트리밍으로 엑셀 직접 생성
-            createExcelWithJdbcStreaming(request, filePath, totalCount, context);
+            // ID 기반 커서 스트리밍으로 엑셀 직접 생성
+            createExcelWithCursorStreaming(request, filePath, totalCount, context);
 
             // 완료 알림 (안전한 WebSocket 전송)
             String downloadUrl = "/api/download/file/" + request.getFileName();
@@ -46,21 +52,16 @@ public class StreamingExcelStrategy implements ExcelDownloadStrategy {
             }
 
         } catch (Exception e) {
-            log.error("JDBC streaming download failed: {}", request.getRequestId(), e);
-            throw new RuntimeException("JDBC 스트리밍 다운로드 실패: " + e.getMessage(), e);
+            log.error("Async Queue download failed: {}", request.getRequestId(), e);
+            throw new RuntimeException("Async Queue 다운로드 실패: " + e.getMessage(), e);
         }
-    }
-
-    @Override
-    public DownloadRequest.DownloadType getSupportedType() {
-        return DownloadRequest.DownloadType.STREAMING;
     }
 
     /**
      * 청크 스트리밍 - 1000건씩만 메모리에 로드 (ID 기반 커서)
      * 메모리 사용량을 일정하게 유지하는 핵심 로직
      */
-    private void createExcelWithJdbcStreaming(DownloadRequest request, String filePath, long totalCount, ExcelContext context) throws Exception {
+    private void createExcelWithCursorStreaming(DownloadRequest request, String filePath, long totalCount, ExcelContext context) throws Exception {
         // 메모리에 10개 행만 유지 (최대 메모리 절약)
         try (SXSSFWorkbook workbook = excelBuilder.createSXSSFWorkbook(10)) {
             // 시트 설정 (컬럼 너비 + 헤더)

@@ -113,12 +113,12 @@ public class DownloadController {
         
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.STREAMING, finalUserId, requestId);
+                    DownloadRequest.DownloadType.ASYNC_QUEUE, finalUserId, requestId);
             
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
                     "message", "스트리밍 다운로드 요청이 큐에 추가되었습니다.",
-                    "type", "STREAMING"
+                    "type", "ASYNC_QUEUE"
             ));
         } catch (Exception e) {
             log.error("Streaming download request failed: {}", requestId, e);
@@ -128,21 +128,44 @@ public class DownloadController {
     }
     
     /**
-     * FastExcel 방식 다운로드 (향후 구현)
+     * EasyExcel 방식 다운로드
      */
-    @PostMapping("/excel/fast")
-    public ResponseEntity<Map<String, String>> downloadExcelFast(
+    @PostMapping("/excel/easy")
+    public ResponseEntity<Map<String, String>> downloadExcelEasy(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
-        String finalUserId = userId;
-        
-        log.info("FastExcel download requested - Session: {}, Request: {}", finalUserId, requestId);
+
+        log.info("EasyExcel download requested - Session: {}, Request: {}", userId, requestId);
         
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.FAST_EXCEL, finalUserId, requestId);
+                    DownloadRequest.DownloadType.EASY_EXCEL, userId, requestId);
             
+            return ResponseEntity.ok(Map.of(
+                    "requestId", downloadRequestId,
+                    "message", "EasyExcel 다운로드 요청이 큐에 추가되었습니다.",
+                    "type", "EASY_EXCEL"
+            ));
+        } catch (Exception e) {
+            log.error("EasyExcel download request failed: {}", requestId, e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/excel/fast")
+    public ResponseEntity<Map<String, String>> downloadExcelFast(
+        @RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        String requestId = UUID.randomUUID().toString();
+
+        log.info("FastExcel download requested - Session: {}, Request: {}", userId, requestId);
+
+        try {
+            String downloadRequestId = excelDownloadService.requestDownload(
+                    DownloadRequest.DownloadType.FAST_EXCEL, userId, requestId);
+
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
                     "message", "FastExcel 다운로드 요청이 큐에 추가되었습니다.",

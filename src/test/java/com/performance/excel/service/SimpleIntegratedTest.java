@@ -74,24 +74,46 @@ class SimpleIntegratedTest {
     }
 
     @Test
+    void 반복_테스트() {
+        for (int i = 0; i < 5; i++) {
+            통합_성능_비교();
+        }
+
+        for (int i = 0; i < 5; i++) {
+            처리량_테스트();
+        }
+    }
+
+    @Test
     void 통합_성능_비교() {
         log.info("=== 📊 통합 성능 비교 ===");
         
         List<TestResult> results = new ArrayList<>();
         
         // OLD_WAY 측정
-        log.info("\n--- OLD_WAY 측정 ---");
-        results.add(measureOldWay());
-        cleanupMemory();
+//        log.info("\n--- OLD_WAY 측정 ---");
+//        results.add(measureOldWay());
+//        cleanupMemory();
         
         // 페이징 측정  
-        log.info("\n--- 페이징 측정 ---");
-        results.add(measurePaging());
-        cleanupMemory();
-        
+//        log.info("\n--- 페이징 측정 ---");
+//        results.add(measurePaging());
+//        cleanupMemory();
+
         // 스트리밍 측정
-        log.info("\n--- 스트리밍 측정 ---");
-        results.add(measureStreaming());
+//        log.info("\n--- 스트리밍 측정 ---");
+//        results.add(measureStreaming());
+//        cleanupMemory();
+
+        // EasyExcel 측정
+//        log.info("\n--- EasyExcel 측정 ---");
+//        results.add(measureEasyExcel());
+//        cleanupMemory();
+
+        // FastExcel 측정
+        log.info("\n--- FastExcel 측정 ---");
+        results.add(measureFastExcel());
+        cleanupMemory();
         
         // 전체 결과 출력
         printSummary(results);
@@ -108,25 +130,35 @@ class SimpleIntegratedTest {
 //        measureSyncThroughput("OLD_WAY", 2, (suffix) -> {
 //            return excelDownloadService.processOldWayDirectly("test", "oldway-" + suffix);
 //        });
-        
 //        cleanupMemory();
         
         // 페이징 처리량 측정 -> 3개 처리에 21분 소요
 //        log.info("\n--- 페이징 처리량 ---");
-//        measureSyncThroughput("페이징", 5, (suffix) -> {
+//        measureSyncThroughput(
+//                "페이징",
+//                1,
+//                (suffix) -> excelDownloadService.processPagingDirectly("test", "paging-" + suffix));
+
+//        log.info("\n--- 페이징(비동기) 처리량 ---");
+//        measureAsyncThroughput("페이징", 20, (suffix) -> {
 //            return excelDownloadService.processPagingDirectly("test", "paging-" + suffix);
 //        });
-
-        log.info("\n--- 페이징(비동기) 처리량 ---");
-        measureAsyncThroughput("페이징", 20, (suffix) -> {
-            return excelDownloadService.processPagingDirectly("test", "paging-" + suffix);
-        });
-        
 //        cleanupMemory();
         
         // 스트리밍 처리량 측정 -> 3개 처리 5분 소요
 //        log.info("\n--- 스트리밍 처리량 ---");
-//        measureStreamingThroughput(10);
+//        measureStreamingThroughput(3, DownloadRequest.DownloadType.ASYNC_QUEUE);
+//        cleanupMemory();
+
+        // EasyExcel 처리량 측정
+//        log.info("\n--- EasyExcel 처리량 ---");
+//        measureStreamingThroughput(3, DownloadRequest.DownloadType.EASY_EXCEL);
+//        cleanupMemory();
+
+        // FastExcel 처리량 측정
+        log.info("\n--- FastExcel 처리량 ---");
+        measureStreamingThroughput(3, DownloadRequest.DownloadType.FAST_EXCEL);
+        cleanupMemory();
     }
 
     // 동기 방식 처리량 측정 (OLD_WAY, 페이징)
@@ -210,8 +242,8 @@ class SimpleIntegratedTest {
     }
 
 
-    // 스트리밍 처리량 측정 (비동기)
-    private void measureStreamingThroughput(int requestCount) {
+    // 비동기 처리량 측정 (비동기 큐, EasyExcel)
+    private void measureStreamingThroughput(int requestCount, DownloadRequest.DownloadType downloadType) {
         // 카운터 리셋
         excelDownloadService.getDownloadQueue().resetCounters();
         
@@ -222,8 +254,8 @@ class SimpleIntegratedTest {
         // 요청 전송
         for (int i = 1; i <= requestCount; i++) {
             excelDownloadService.requestDownload(
-                DownloadRequest.DownloadType.STREAMING, 
-                "test", "streaming-" + i);
+                    downloadType,
+                "test", "async-" + i);
             log.info("요청 {}/{} 전송 완료", i, requestCount);
             
             try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
@@ -255,7 +287,7 @@ class SimpleIntegratedTest {
         long totalTime = System.currentTimeMillis() - startTime;
         var finalStatus = excelDownloadService.getQueueStatus();
         
-        log.info("\n📊 스트리밍 처리량 결과:");
+        log.info("\n📊 비동기({}) 처리량 결과:", downloadType.name());
         log.info("  총 시간: {}분", String.format("%.1f", totalTime / (1000.0 * 60.0)));
         log.info("  성공: {}개", finalStatus.getSuccessCount());
         log.info("  실패: {}개", finalStatus.getFailedCount());
@@ -341,7 +373,7 @@ class SimpleIntegratedTest {
             long timeBefore = System.currentTimeMillis();
             
             String requestId = excelDownloadService.requestDownload(
-                DownloadRequest.DownloadType.STREAMING, "test", UUID.randomUUID().toString());
+                DownloadRequest.DownloadType.ASYNC_QUEUE, "test", UUID.randomUUID().toString());
             
             long responseTime = System.currentTimeMillis() - timeBefore;
             
@@ -365,6 +397,79 @@ class SimpleIntegratedTest {
             
         } catch (Exception e) {
             TestResult result = TestResult.failure("스트리밍", e.getMessage());
+            result.printResult();
+            return result;
+        }
+    }
+
+    // EasyExcel 측정 (비동기)
+    private TestResult measureEasyExcel() {
+        try {
+            long memoryBefore = memoryBean.getHeapMemoryUsage().getUsed();
+            long gcBefore = getTotalGCTime();
+            long timeBefore = System.currentTimeMillis();
+
+            String requestId = excelDownloadService.requestDownload(
+                DownloadRequest.DownloadType.EASY_EXCEL, "test", UUID.randomUUID().toString());
+
+            long responseTime = System.currentTimeMillis() - timeBefore;
+
+            // 실제 처리 완료까지 대기
+            long processStart = System.currentTimeMillis();
+            while (excelDownloadService.getQueueStatus().getQueueSize() > 0 ||
+                   excelDownloadService.getQueueStatus().getProcessingCount() > 0) {
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            }
+            long processTime = System.currentTimeMillis() - processStart;
+
+            long gcAfter = getTotalGCTime();
+            long memoryAfter = memoryBean.getHeapMemoryUsage().getUsed();
+
+            long memoryUsed = (memoryAfter - memoryBefore) / (1024 * 1024);
+            long gcTime = gcAfter - gcBefore;
+
+            TestResult result = TestResult.successAsync("EasyExcel", responseTime, memoryUsed, gcTime, requestId, processTime);
+            result.printResult();
+            return result;
+
+        } catch (Exception e) {
+            TestResult result = TestResult.failure("EasyExcel", e.getMessage());
+            result.printResult();
+            return result;
+        }
+    }
+    // FastExcel 측정 (비동기)
+    private TestResult measureFastExcel() {
+        try {
+            long memoryBefore = memoryBean.getHeapMemoryUsage().getUsed();
+            long gcBefore = getTotalGCTime();
+            long timeBefore = System.currentTimeMillis();
+
+            String requestId = excelDownloadService.requestDownload(
+                DownloadRequest.DownloadType.FAST_EXCEL, "test", UUID.randomUUID().toString());
+
+            long responseTime = System.currentTimeMillis() - timeBefore;
+
+            // 실제 처리 완료까지 대기
+            long processStart = System.currentTimeMillis();
+            while (excelDownloadService.getQueueStatus().getQueueSize() > 0 ||
+                   excelDownloadService.getQueueStatus().getProcessingCount() > 0) {
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            }
+            long processTime = System.currentTimeMillis() - processStart;
+
+            long gcAfter = getTotalGCTime();
+            long memoryAfter = memoryBean.getHeapMemoryUsage().getUsed();
+
+            long memoryUsed = (memoryAfter - memoryBefore) / (1024 * 1024);
+            long gcTime = gcAfter - gcBefore;
+
+            TestResult result = TestResult.successAsync("FastExcel", responseTime, memoryUsed, gcTime, requestId, processTime);
+            result.printResult();
+            return result;
+
+        } catch (Exception e) {
+            TestResult result = TestResult.failure("FastExcel", e.getMessage());
             result.printResult();
             return result;
         }

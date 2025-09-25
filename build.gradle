@@ -26,8 +26,9 @@ dependencies {
     // Excel processing - 최신 보안 패치 적용된 버전
     implementation 'org.apache.poi:poi:5.4.1'
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
-    
-    // FastExcel - 대용량 Excel 처리용
+
+    // 대용량 Excel 처리용 라이브러리
+    implementation 'com.alibaba:easyexcel:3.3.2'
     implementation 'org.dhatim:fastexcel:0.19.0'
     
     // 보안 취약점 해결을 위한 의존성 강제 업데이트
