@@ -45,6 +45,7 @@ pids
 
 # Downloads directory
 downloads/
+test-downloads/
 *.xlsx
 *.xls
 
@@ -58,6 +59,7 @@ application-*.properties
 application-*.yml
 !application.yml
 !application.properties
+docs/bak/
 
 # Temporary files
 *.tmp
@@ -81,3 +83,7 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
+# Heap dump
+*.hprof
+

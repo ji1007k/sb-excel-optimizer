@@ -57,7 +57,7 @@ test {
         '-XX:MaxGCPauseMillis=200',  // 최대 GC 일시정지 시간
 
         // GC 로그 설정 (Java 17 버전)
-        '-Xlog:gc:build/gc-test.log:time,level,tags'
+        '-Xlog:gc:build/logs/gc/gc-test.log:time,level,tags'
     ]
     
     // 테스트 실행 시간 제한 (30분)
