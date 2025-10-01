@@ -15,46 +15,55 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// 엔티티 사용 -> 타입 안정성 향상
+/**
+ * EasyExcel 라이브러리 전략 (비동기)
+ * 
+ * 특징:
+ * - 알리바바 EasyExcel 사용
+ * - 엔티티 어노테이션 기반 자동 매핑
+ * - ID 커서 기반 페이징
+ * - Service 레이어에서 BlockingQueue로 비동기 처리
+ * 
+ * 성능:
+ * - 메모리: ~20MB
+ * - 처리량: 30.1개/분
+ * - 응답시간: ~3ms (즉시)
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class EasyExcelStrategy implements ExcelDownloadStrategy {
+public class EasyexcelStrategy implements ExcelDownloadStrategy {
 
     private final TestDataExcelBuilder excelBuilder;
-
-    // DB round-trip 최소화 지점 탐색 필요
     private static final int CHUNK_SIZE = 1000;
-    // 진행률 업데이트 주기
-    private static final int PROGRESS_UPDATE_INTERVAL = 50000;
+    private static final int PROGRESS_UPDATE_INTERVAL = 5000;
     
     @Override
     public void process(DownloadRequest request, ExcelContext context) {
-//        throw new UnsupportedOperationException("EasyExcel processing not implemented yet");
-        log.info("Processing with EASY_EXCEL method: {}", request.getRequestId());
+        log.info("EasyExcel 방식 처리 시작: {}", request.getRequestId());
 
         long totalCount = context.getTestDataRepository().getTotalCount();
         String filePath = excelBuilder.getDownloadPath(context.getDownloadDirectory(), request.getFileName());
 
-        // SXSSFWorkbook(10) → EasyExcel.write()
-        // 엔티티에서 어노테이션 정보 토대로 헤더명, 컬럼너비 등 자동 세팅
+        // EasyExcel로 엑셀 파일 생성 (어노테이션 기반 자동 매핑)
         try (ExcelWriter excelWriter = EasyExcel.write(filePath, TestData.class).build()) {
-            // 복잡한 시트 설정 → 간단한 writerSheet()
-            WriteSheet writeSheet = EasyExcel.writerSheet("Test Data").build(); // 엑셀 시트(탭) 생성
+            WriteSheet writeSheet = EasyExcel.writerSheet("Test Data").build();
 
             long processedCount = 0;
             Long lastId = 0L;
+            
             while (true) {
-                String chunkSql = """
-                            SELECT id, name, description, value, category, created_at 
-                            FROM test_data
-                            WHERE id > ? 
-                            ORDER BY id 
-                            LIMIT ?
-                        """;
+                // ID 커서 기반 쿼리
+                String cursorSql = """
+                    SELECT id, name, description, value, category, created_at 
+                    FROM test_data
+                    WHERE id > ? 
+                    ORDER BY id 
+                    LIMIT ?
+                    """;
 
-                // ✅ 개선된 방식: 1단계 변환 (효율적)
-                List<TestData> excelDatas = context.getJdbcTemplate().query(chunkSql,
+                // 엔티티로 직접 매핑 (1단계 변환)
+                List<TestData> excelDatas = context.getJdbcTemplate().query(cursorSql,
                         (rs, rowNum) -> TestData.builder()
                                 .id(rs.getLong("id"))
                                 .name(rs.getString("name"))
@@ -67,33 +76,37 @@ public class EasyExcelStrategy implements ExcelDownloadStrategy {
 
                 if (excelDatas.isEmpty()) break;
 
-                // 바로 사용
+                // EasyExcel로 쓰기 (어노테이션 기반 자동 처리)
                 excelWriter.write(excelDatas, writeSheet);
 
-                // 진행률 + 메모리 정리
+                // 진행률 업데이트
                 processedCount += excelDatas.size();
-                lastId = excelDatas.get(excelDatas.size() - 1).getId(); // 마지막 ID 저장
+                lastId = excelDatas.get(excelDatas.size() - 1).getId();
 
-                // 진행률 업데이트 빈도 조절 (5000건마다 - WebSocket 부하 줄이기)
+                // 진행률 업데이트 빈도 조절 (5000건마다)
                 if (processedCount % PROGRESS_UPDATE_INTERVAL == 0) {
                     DownloadProgress progress = DownloadProgress.processing(
                             request.getRequestId(), totalCount, processedCount);
                     try {
                         context.getProgressWebSocketHandler().sendProgress(request.getUserId(), progress);
                     } catch (Exception e) {
-                        log.warn("Failed to send progress update: {}", e.getMessage());
+                        log.warn("진행률 전송 실패: {}", e.getMessage());
                     }
                 }
 
-                log.debug("Processed chunk: {}-{} ({} total rows)", lastId - CHUNK_SIZE, lastId, processedCount);
+                log.debug("EasyExcel 청크 처리 완료: ID {}-{} (총 {}건)", lastId - CHUNK_SIZE, lastId, processedCount);
             }
 
-            log.info("EasyExcel file created: {} ({} rows)", filePath, processedCount);
+            log.info("EasyExcel 파일 생성 완료: {} ({}건)", filePath, processedCount);
+            
+        } catch (Exception e) {
+            log.error("EasyExcel 파일 생성 실패: {}", request.getRequestId(), e);
+            throw new RuntimeException("EasyExcel 파일 생성 실패: " + e.getMessage(), e);
         }
     }
     
     @Override
     public DownloadRequest.DownloadType getSupportedType() {
-        return DownloadRequest.DownloadType.EASY_EXCEL;
+        return DownloadRequest.DownloadType.EASYEXCEL;
     }
 }

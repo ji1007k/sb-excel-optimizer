@@ -57,16 +57,16 @@ public class ExcelDownloadService {
     }
 
     /**
-     * 초기 구현 방식: 큐 없이 바로 처리! (동기 처리)
+     * XSSF 전체 로드 방식: 큐 없이 바로 처리 (동기)
      */
-    public String processOldWayDirectly(String userId, String requestId) {
-        log.info("초기 구현 방식 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
+    public String processXssfFullLoadDirectly(String userId, String requestId) {
+        log.info("XSSF 전체 로드 방식 처리 시작");
 
         try {
             DownloadRequest request = DownloadRequest.builder()
                     .requestId(requestId)
-                    .fileName("basic_method_" + requestId + ".xlsx")
-                    .downloadType(DownloadRequest.DownloadType.OLD_WAY)
+                    .fileName("xssf_full_load_" + requestId + ".xlsx")
+                    .downloadType(DownloadRequest.DownloadType.XSSF_FULL_LOAD)
                     .userId(userId)
                     .build();
 
@@ -76,22 +76,22 @@ public class ExcelDownloadService {
             return request.getFileName();
 
         } catch (Exception e) {
-            log.error("초기 구현 방식 처리 실패: {}", requestId, e);
-            throw new RuntimeException("초기 구현 방식 처리 실패: " + e.getMessage(), e);
+            log.error("XSSF 전체 로드 처리 실패: {}", requestId, e);
+            throw new RuntimeException("XSSF 전체 로드 처리 실패: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 페이징 방식: 큐 없이 바로 처리! (동기 처리)
+     * SXSSF OFFSET 페이징 방식: 큐 없이 바로 처리 (동기)
      */
-    public String processPagingDirectly(String userId, String requestId) {
-        log.info("페이징 방식 처리 시작 - 동기 처리로 완성까지 기다려야 함!");
+    public String processSxssfOffsetPagingDirectly(String userId, String requestId) {
+        log.info("SXSSF OFFSET 페이징 방식 처리 시작");
 
         try {
             DownloadRequest request = DownloadRequest.builder()
                     .requestId(requestId)
-                    .fileName("paging_method_" + requestId + ".xlsx")
-                    .downloadType(DownloadRequest.DownloadType.PAGING)
+                    .fileName("sxssf_offset_paging_" + requestId + ".xlsx")
+                    .downloadType(DownloadRequest.DownloadType.SXSSF_OFFSET_PAGING)
                     .userId(userId)
                     .build();
 
@@ -101,8 +101,8 @@ public class ExcelDownloadService {
             return request.getFileName();
 
         } catch (Exception e) {
-            log.error("페이징 방식 처리 실패: {}", requestId, e);
-            throw new RuntimeException("페이징 방식 처리 실패: " + e.getMessage(), e);
+            log.error("SXSSF OFFSET 페이징 처리 실패: {}", requestId, e);
+            throw new RuntimeException("SXSSF OFFSET 페이징 처리 실패: " + e.getMessage(), e);
         }
     }
 
@@ -125,7 +125,7 @@ public class ExcelDownloadService {
             try {
                 progressWebSocketHandler.sendProgress(userId, progress);
             } catch (Exception e) {
-                log.warn("Failed to send queued progress: {}", e.getMessage());
+                log.warn("큐 진행률 전송 실패: {}", e.getMessage());
             }
 
             // 큐 처리 시작
@@ -150,7 +150,7 @@ public class ExcelDownloadService {
                     // 성공 수 카운팅
                     downloadQueue.markCompleted(request.getRequestId());
                 } catch (Exception e) {
-                    log.error("Download processing failed: {}", request.getRequestId(), e);
+                    log.error("다운로드 처리 실패: {}", request.getRequestId(), e);
 
                     // 실패 수 카운팅
                     downloadQueue.markFailed(request.getRequestId(), e.getMessage());
@@ -160,7 +160,7 @@ public class ExcelDownloadService {
                     try {
                         progressWebSocketHandler.sendProgress(request.getUserId(), failedProgress);
                     } catch (Exception wsException) {
-                        log.warn("Failed to send failure progress: {}", wsException.getMessage());
+                        log.warn("실패 진행률 전송 실패: {}", wsException.getMessage());
                     }
                 } finally {
                     // 다음 요청 처리
@@ -174,12 +174,12 @@ public class ExcelDownloadService {
      * 전략 패턴을 사용한 다운로드 처리
      */
     private void processWithStrategy(DownloadRequest request) {
-        log.info("Processing download request: {} ({})", request.getRequestId(), request.getDownloadType());
+        log.info("다운로드 요청 처리 시작: {} ({})", request.getRequestId(), request.getDownloadType());
 
         // 해당 타입에 맞는 전략 선택
         ExcelDownloadStrategy strategy = strategyMap.get(request.getDownloadType());
         if (strategy == null) {
-            throw new IllegalArgumentException("Unsupported download type: " + request.getDownloadType());
+            throw new IllegalArgumentException("지원하지 않는 다운로드 타입: " + request.getDownloadType());
         }
 
         // Context 생성

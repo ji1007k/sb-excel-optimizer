@@ -54,21 +54,21 @@
                     <strong>⚠️ 중요:</strong> 아래 버튼들을 여러 번 클릭하여 "20명 동시 다운로드" 상황을 시뮬레이션하세요!
                 </div>
                 <div class="button-group">
-                    <button class="btn btn-danger" onclick="downloadExcel('old-way')" 
+                    <button class="btn btn-danger" onclick="downloadExcel('xssf-full-load')"
                             style="background: #d32f2f; font-weight: bold;">
-                        XSSF 페이징X 큐X
+                        XSSF 페이징X(동기)
                     </button>
-                    <button class="btn btn-secondary" onclick="downloadExcel('paging')">
-                        페이징 다운로드 (기존 방식)
+                    <button class="btn btn-secondary" onclick="downloadExcel('sxssf-offset-paging')">
+                        SXSSF+ROWNUM 페이징(동기)
                     </button>
-                    <button class="btn btn-success" onclick="downloadExcel('streaming')">
-                        비동기 큐 다운로드 (동시성 처리)
+                    <button class="btn btn-success" onclick="downloadExcel('sxssf-cursor-paging')">
+                        SXSSF+커서 페이징(비동기)
                     </button>
-                    <button class="btn btn-success" onclick="downloadExcel('easy')">
-                        EasyExcel 다운로드 (성능 최적화)
+                    <button class="btn btn-success" onclick="downloadExcel('easyexcel')">
+                        EasyExcel(비동기)
                     </button>
-                    <button class="btn btn-success" onclick="downloadExcel('fast')">
-                        FastExcel 다운로드 (성능 최적화)
+                    <button class="btn btn-success" onclick="downloadExcel('fastexcel')">
+                        FastExcel(비동기)
                     </button>
                     <button class="btn btn-primary" onclick="getQueueStatus()">
                         큐 상태 확인
@@ -99,7 +99,7 @@
             </div>
             
             <!-- 20명 시뮬레이션 -->
-            <div class="section">
+            <div class="section" style="display: none;">
                 <h2>👥 20명 동시 다운로드 시뮬레이션</h2>
                 <div class="button-group">
                     <button class="btn btn-danger" onclick="simulate20Users()" style="font-size: 1.2em; padding: 15px 30px;">

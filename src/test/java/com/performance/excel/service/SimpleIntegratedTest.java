@@ -75,11 +75,11 @@ class SimpleIntegratedTest {
 
     @Test
     void 반복_테스트() {
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 3; i++) {
             통합_성능_비교();
         }
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 3; i++) {
             처리량_테스트();
         }
     }
@@ -90,25 +90,25 @@ class SimpleIntegratedTest {
         
         List<TestResult> results = new ArrayList<>();
         
-        // OLD_WAY 측정
-//        log.info("\n--- OLD_WAY 측정 ---");
-//        results.add(measureOldWay());
-//        cleanupMemory();
+        // XSSF_FULL_LOAD 측정
+        log.info("\n--- XSSF_FULL_LOAD 측정 ---");
+        results.add(measureOldWay());
+        cleanupMemory();
         
         // 페이징 측정  
-//        log.info("\n--- 페이징 측정 ---");
-//        results.add(measurePaging());
-//        cleanupMemory();
+        log.info("\n--- 페이징 측정 ---");
+        results.add(measurePaging());
+        cleanupMemory();
 
         // 스트리밍 측정
-//        log.info("\n--- 스트리밍 측정 ---");
-//        results.add(measureStreaming());
-//        cleanupMemory();
+        log.info("\n--- 스트리밍 측정 ---");
+        results.add(measureStreaming());
+        cleanupMemory();
 
         // EasyExcel 측정
-//        log.info("\n--- EasyExcel 측정 ---");
-//        results.add(measureEasyExcel());
-//        cleanupMemory();
+        log.info("\n--- EasyExcel 측정 ---");
+        results.add(measureEasyExcel());
+        cleanupMemory();
 
         // FastExcel 측정
         log.info("\n--- FastExcel 측정 ---");
@@ -125,10 +125,10 @@ class SimpleIntegratedTest {
         
 //        int requestCount = 3; // 각 방식당 5개씩
         
-        // OLD_WAY 처리량 측정 -> 1개도 OOM
-//        log.info("\n--- OLD_WAY 처리량 ---");
-//        measureSyncThroughput("OLD_WAY", 2, (suffix) -> {
-//            return excelDownloadService.processOldWayDirectly("test", "oldway-" + suffix);
+        // XSSF_FULL_LOAD 처리량 측정 -> 1개도 OOM
+//        log.info("\n--- XSSF_FULL_LOAD 처리량 ---");
+//        measureSyncThroughput("XSSF_FULL_LOAD", 2, (suffix) -> {
+//            return excelDownloadService.processXssfFullLoadDirectly("test", "oldway-" + suffix);
 //        });
 //        cleanupMemory();
         
@@ -137,31 +137,31 @@ class SimpleIntegratedTest {
 //        measureSyncThroughput(
 //                "페이징",
 //                1,
-//                (suffix) -> excelDownloadService.processPagingDirectly("test", "paging-" + suffix));
+//                (suffix) -> excelDownloadService.processSxssfOffsetPagingDirectly("test", "paging-" + suffix));
 
 //        log.info("\n--- 페이징(비동기) 처리량 ---");
 //        measureAsyncThroughput("페이징", 20, (suffix) -> {
-//            return excelDownloadService.processPagingDirectly("test", "paging-" + suffix);
+//            return excelDownloadService.processSxssfOffsetPagingDirectly("test", "paging-" + suffix);
 //        });
 //        cleanupMemory();
         
         // 스트리밍 처리량 측정 -> 3개 처리 5분 소요
 //        log.info("\n--- 스트리밍 처리량 ---");
-//        measureStreamingThroughput(3, DownloadRequest.DownloadType.ASYNC_QUEUE);
+//        measureStreamingThroughput(3, DownloadRequest.DownloadType.SXSSF_CURSOR_PAGING);
 //        cleanupMemory();
 
         // EasyExcel 처리량 측정
 //        log.info("\n--- EasyExcel 처리량 ---");
-//        measureStreamingThroughput(3, DownloadRequest.DownloadType.EASY_EXCEL);
+//        measureStreamingThroughput(3, DownloadRequest.DownloadType.EASYEXCEL);
 //        cleanupMemory();
 
         // FastExcel 처리량 측정
         log.info("\n--- FastExcel 처리량 ---");
-        measureStreamingThroughput(3, DownloadRequest.DownloadType.FAST_EXCEL);
+        measureStreamingThroughput(3, DownloadRequest.DownloadType.FASTEXCEL);
         cleanupMemory();
     }
 
-    // 동기 방식 처리량 측정 (OLD_WAY, 페이징)
+    // 동기 방식 처리량 측정 (XSSF_FULL_LOAD, 페이징)
     private void measureSyncThroughput(String method, int requestCount, java.util.function.Function<String, String> processor) {
         log.info("{}개 요청 순차 처리 시작", requestCount);
         
@@ -197,7 +197,7 @@ class SimpleIntegratedTest {
         log.info("  분당 처리량: {}개/분", String.format("%.1f", throughputPerMinute));
     }
 
-    // 비동기 방식 처리량 측정 (OLD_WAY, 페이징)
+    // 비동기 방식 처리량 측정 (XSSF_FULL_LOAD, 페이징)
     private void measureAsyncThroughput(String method, int requestCount, java.util.function.Function<String, String> processor) {
         log.info("{}개 요청 비동기 처리 시작", requestCount);
 
@@ -300,14 +300,14 @@ class SimpleIntegratedTest {
         excelDownloadService.getDownloadQueue().resetCounters();
     }
 
-    // OLD_WAY 측정
+    // XSSF_FULL_LOAD 측정
     private TestResult measureOldWay() {
         try {
             long memoryBefore = memoryBean.getHeapMemoryUsage().getUsed();
             long gcBefore = getTotalGCTime();
             long timeBefore = System.currentTimeMillis();
             
-            String fileName = excelDownloadService.processOldWayDirectly("test", UUID.randomUUID().toString());
+            String fileName = excelDownloadService.processXssfFullLoadDirectly("test", UUID.randomUUID().toString());
             
             long timeAfter = System.currentTimeMillis();
             long gcAfter = getTotalGCTime();
@@ -317,7 +317,7 @@ class SimpleIntegratedTest {
             long memoryUsed = (memoryAfter - memoryBefore) / (1024 * 1024);
             long gcTime = gcAfter - gcBefore;
             
-            TestResult result = TestResult.success("OLD_WAY", responseTime, memoryUsed, gcTime, fileName);
+            TestResult result = TestResult.success("XSSF_FULL_LOAD", responseTime, memoryUsed, gcTime, fileName);
             result.printResult();
             return result;
             
@@ -327,11 +327,11 @@ class SimpleIntegratedTest {
                 System.gc();
                 try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
             }
-            TestResult result = TestResult.failure("OLD_WAY", "OOM 발생");
+            TestResult result = TestResult.failure("XSSF_FULL_LOAD", "OOM 발생");
             result.printResult();
             return result;
         } catch (Exception e) {
-            TestResult result = TestResult.failure("OLD_WAY", e.getMessage());
+            TestResult result = TestResult.failure("XSSF_FULL_LOAD", e.getMessage());
             result.printResult();
             return result;
         }
@@ -344,7 +344,7 @@ class SimpleIntegratedTest {
             long gcBefore = getTotalGCTime();
             long timeBefore = System.currentTimeMillis();
             
-            String fileName = excelDownloadService.processPagingDirectly("test", UUID.randomUUID().toString());
+            String fileName = excelDownloadService.processSxssfOffsetPagingDirectly("test", UUID.randomUUID().toString());
             
             long timeAfter = System.currentTimeMillis();
             long gcAfter = getTotalGCTime();
@@ -373,7 +373,7 @@ class SimpleIntegratedTest {
             long timeBefore = System.currentTimeMillis();
             
             String requestId = excelDownloadService.requestDownload(
-                DownloadRequest.DownloadType.ASYNC_QUEUE, "test", UUID.randomUUID().toString());
+                DownloadRequest.DownloadType.SXSSF_CURSOR_PAGING, "test", UUID.randomUUID().toString());
             
             long responseTime = System.currentTimeMillis() - timeBefore;
             
@@ -410,7 +410,7 @@ class SimpleIntegratedTest {
             long timeBefore = System.currentTimeMillis();
 
             String requestId = excelDownloadService.requestDownload(
-                DownloadRequest.DownloadType.EASY_EXCEL, "test", UUID.randomUUID().toString());
+                DownloadRequest.DownloadType.EASYEXCEL, "test", UUID.randomUUID().toString());
 
             long responseTime = System.currentTimeMillis() - timeBefore;
 
@@ -446,7 +446,7 @@ class SimpleIntegratedTest {
             long timeBefore = System.currentTimeMillis();
 
             String requestId = excelDownloadService.requestDownload(
-                DownloadRequest.DownloadType.FAST_EXCEL, "test", UUID.randomUUID().toString());
+                DownloadRequest.DownloadType.FASTEXCEL, "test", UUID.randomUUID().toString());
 
             long responseTime = System.currentTimeMillis() - timeBefore;
 

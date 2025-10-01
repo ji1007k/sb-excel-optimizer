@@ -48,6 +48,10 @@ dependencies {
 
 test {
     useJUnitPlatform()
+
+    doFirst {
+        file("build/logs/gc").mkdirs()  // gc 로그 폴더 생성
+    }
     
     // 성능 테스트를 위한 JVM 옵션
     jvmArgs = [

@@ -30,20 +30,20 @@ public class DownloadController {
 
 
     /**
-     * 초기 구현 방식 Excel 다운로드 (동기 처리 - 완성까지 기다려야 함!)
+     * XSSF 전체 로드 Excel 다운로드 (동기 - 완성까지 대기)
      */
-    @PostMapping("/excel/old-way")
-    public ResponseEntity<Resource> downloadExcelOldWay(
+    @PostMapping("/excel/xssf-full-load")
+    public ResponseEntity<Resource> downloadExcelXssfFullLoad(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
         String finalUserId = userId;
 
-        log.warn("초기 구현 방식 - 동기 처리로 완성까지 기다려야 함! 사용자: {}", finalUserId);
+        log.warn("XSSF 전체 로드. 사용자: {}", finalUserId);
 
         try {
             // 서비스에서 파일명만 받아옴
-            String fileName = excelDownloadService.processOldWayDirectly(finalUserId, requestId);
+            String fileName = excelDownloadService.processXssfFullLoadDirectly(finalUserId, requestId);
             
             // Controller에서 HTTP 응답 처리
             File file = new File(getDownloadPath() + fileName);
@@ -59,26 +59,26 @@ public class DownloadController {
                     .body(resource);
             
         } catch (Exception e) {
-            log.error("초기 구현 방식 다운로드 실패: {}", requestId, e);
+            log.error("XSSF 전체 로드 다운로드 실패: {}", requestId, e);
             return ResponseEntity.internalServerError().build();
         }
     }
     
     /**
-     * 페이징 방식 Excel 다운로드 (큐 사용 안함 - 동기 처리)
+     * SXSSF OFFSET 페이징 Excel 다운로드 (동기 - 완성까지 대기)
      */
-    @PostMapping("/excel/paging")
-    public ResponseEntity<Resource> downloadExcelPaging(
+    @PostMapping("/excel/sxssf-offset-paging")
+    public ResponseEntity<Resource> downloadExcelSxssfOffsetPaging(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
         String finalUserId = userId;
 
-        log.info("Paging download requested - HTTP Session: {}, Request: {}", finalUserId, requestId);
+        log.info("SXSSF OFFSET 페이징 다운로드 요청 - 사용자: {}, 요청: {}", finalUserId, requestId);
 
         try {
             // 서비스에서 파일명만 받아옴 (동기 처리)
-            String fileName = excelDownloadService.processPagingDirectly(finalUserId, requestId);
+            String fileName = excelDownloadService.processSxssfOffsetPagingDirectly(finalUserId, requestId);
             
             // Controller에서 HTTP 응답 처리
             File file = new File(getDownloadPath() + fileName);
@@ -94,85 +94,88 @@ public class DownloadController {
                     .body(resource);
             
         } catch (Exception e) {
-            log.error("Paging download failed: {}", requestId, e);
+            log.error("SXSSF OFFSET 페이징 다운로드 실패: {}", requestId, e);
             return ResponseEntity.internalServerError().build();
         }
     }
     
     /**
-     * 스트리밍 방식 Excel 다운로드 (메모리 최적화)
+     * SXSSF CURSOR 페이징 Excel 다운로드 (비동기 - 즉시 응답)
      */
-    @PostMapping("/excel/streaming")
-    public ResponseEntity<Map<String, String>> downloadExcelStreaming(
+    @PostMapping("/excel/sxssf-cursor-paging")
+    public ResponseEntity<Map<String, String>> downloadExcelSxssfCursorPaging(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
         String finalUserId = userId;
 
-        log.info("Streaming download requested - HTTP Session: {}, Request: {}", finalUserId, requestId);
+        log.info("SXSSF CURSOR 페이징 다운로드 요청 - 사용자: {}, 요청: {}", finalUserId, requestId);
         
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.ASYNC_QUEUE, finalUserId, requestId);
+                    DownloadRequest.DownloadType.SXSSF_CURSOR_PAGING, finalUserId, requestId);
             
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
-                    "message", "스트리밍 다운로드 요청이 큐에 추가되었습니다.",
-                    "type", "ASYNC_QUEUE"
+                    "message", "SXSSF CURSOR 페이징 다운로드 요청이 큐에 추가되었습니다.",
+                    "type", "SXSSF_CURSOR_PAGING"
             ));
         } catch (Exception e) {
-            log.error("Streaming download request failed: {}", requestId, e);
+            log.error("SXSSF CURSOR 페이징 다운로드 요청 실패: {}", requestId, e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
         }
     }
     
     /**
-     * EasyExcel 방식 다운로드
+     * EasyExcel 다운로드 (비동기 - 즉시 응답)
      */
-    @PostMapping("/excel/easy")
-    public ResponseEntity<Map<String, String>> downloadExcelEasy(
+    @PostMapping("/excel/easyexcel")
+    public ResponseEntity<Map<String, String>> downloadExcelEasyexcel(
             @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
 
-        log.info("EasyExcel download requested - Session: {}, Request: {}", userId, requestId);
+        log.info("EasyExcel 다운로드 요청 - 사용자: {}, 요청: {}", userId, requestId);
         
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.EASY_EXCEL, userId, requestId);
+                    DownloadRequest.DownloadType.EASYEXCEL, userId, requestId);
             
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
                     "message", "EasyExcel 다운로드 요청이 큐에 추가되었습니다.",
-                    "type", "EASY_EXCEL"
+                    "type", "EASYEXCEL"
             ));
         } catch (Exception e) {
-            log.error("EasyExcel download request failed: {}", requestId, e);
+            log.error("EasyExcel 다운로드 요청 실패: {}", requestId, e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
         }
     }
 
-    @PostMapping("/excel/fast")
-    public ResponseEntity<Map<String, String>> downloadExcelFast(
+    /**
+     * FastExcel 다운로드 (비동기 - 즉시 응답)
+     */
+    @PostMapping("/excel/fastexcel")
+    public ResponseEntity<Map<String, String>> downloadExcelFastexcel(
         @RequestHeader(value = "X-User-Id", required = false) String userId
     ) {
         String requestId = UUID.randomUUID().toString();
 
-        log.info("FastExcel download requested - Session: {}, Request: {}", userId, requestId);
+        log.info("FastExcel 다운로드 요청 - 사용자: {}, 요청: {}", userId, requestId);
 
         try {
             String downloadRequestId = excelDownloadService.requestDownload(
-                    DownloadRequest.DownloadType.FAST_EXCEL, userId, requestId);
+                    DownloadRequest.DownloadType.FASTEXCEL, userId, requestId);
 
             return ResponseEntity.ok(Map.of(
                     "requestId", downloadRequestId,
                     "message", "FastExcel 다운로드 요청이 큐에 추가되었습니다.",
-                    "type", "FAST_EXCEL"
+                    "type", "FASTEXCEL"
             ));
         } catch (Exception e) {
-            log.error("FastExcel download request failed: {}", requestId, e);
+            log.error("FastExcel 다운로드 요청 실패: {}", requestId, e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "다운로드 요청 실패: " + e.getMessage()));
         }
@@ -202,7 +205,7 @@ public class DownloadController {
                     .body(resource);
                     
         } catch (Exception e) {
-            log.error("File download failed: {}", fileName, e);
+            log.error("파일 다운로드 실패: {}", fileName, e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -216,7 +219,7 @@ public class DownloadController {
             DownloadQueue.QueueStatus status = excelDownloadService.getQueueStatus();
             return ResponseEntity.ok(status);
         } catch (Exception e) {
-            log.error("Failed to get queue status", e);
+            log.error("큐 상태 조회 실패", e);
             return ResponseEntity.internalServerError().build();
         }
     }
