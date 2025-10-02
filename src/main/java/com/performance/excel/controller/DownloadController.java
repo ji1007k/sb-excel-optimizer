@@ -1,8 +1,8 @@
 package com.performance.excel.controller;
 
 import com.performance.excel.dto.DownloadRequest;
-import com.performance.excel.service.DownloadQueue;
-import com.performance.excel.service.ExcelDownloadService;
+import com.performance.excel.service.ExcelDownloadServiceV2;
+import com.performance.excel.service.RedisDownloadQueue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,8 +23,9 @@ import java.util.UUID;
 @Slf4j
 public class DownloadController {
     
-    private final ExcelDownloadService excelDownloadService;
-    
+//    private final ExcelDownloadService excelDownloadService;
+    private final ExcelDownloadServiceV2 excelDownloadService;
+
     @Value("${excel.download.directory:downloads/}")
     private String downloadDirectory;
 
@@ -214,9 +215,10 @@ public class DownloadController {
      * 다운로드 큐 상태 조회
      */
     @GetMapping("/queue/status")
-    public ResponseEntity<DownloadQueue.QueueStatus> getQueueStatus() {
+//    public ResponseEntity<DownloadQueue.QueueStatus> getQueueStatus() {
+    public ResponseEntity<RedisDownloadQueue.QueueStatus> getQueueStatus() {
         try {
-            DownloadQueue.QueueStatus status = excelDownloadService.getQueueStatus();
+            RedisDownloadQueue.QueueStatus status = excelDownloadService.getQueueStatus();
             return ResponseEntity.ok(status);
         } catch (Exception e) {
             log.error("큐 상태 조회 실패", e);

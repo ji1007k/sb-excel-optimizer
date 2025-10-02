@@ -1,0 +1,8 @@
+### 1. SXSSF CURSOR 페이징 방식 다운로드 요청
+POST http://localhost:8081/api/download/excel/sxssf-cursor-paging
+Content-Type: application/json
+
+{
+  "downloadType": "sxssf-cursor-paging",
+  "userId": "test-user-1"
+}

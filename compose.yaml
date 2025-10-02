@@ -1,0 +1,13 @@
+services:
+  redis:
+    # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
+    image: redis:7-alpine
+    ports:
+      - "36379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes # AOF 방식 영속화
+
+
+volumes:
+  redis-data:

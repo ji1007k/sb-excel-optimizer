@@ -1,5 +1,6 @@
 # Excel Performance Optimizer Configuration
 
+# 프로파일 공통 설정
 spring:
   application:
     name: excel-performance-optimizer
@@ -7,6 +8,12 @@ spring:
   # 프로파일 기본값
   profiles:
     active: dev
+
+  # Redis 설정
+  data:
+    redis:
+      host: localhost
+      port: 36379
 
   # JPA 설정
   jpa:
@@ -22,6 +29,7 @@ spring:
         order_inserts: true
         order_updates: true
 
+---
 # 로깅 설정
 logging:
   level:
