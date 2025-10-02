@@ -1,0 +1,23 @@
+# docker 컨테이너명 확인 및 redis-cli 접속
+docker ps
+docker exec -it [redis 컨테이너명] redis-cli
+
+# Pending 확인
+XPENDING excel:download:queue excel-workers
+1) (integer) 3  # ← Pending 3개
+
+# 처리 중 목록 확인
+SMEMBERS excel:processing
+1) "req-1"
+2) "req-2"
+3) "req-3"
+
+# Consumer group 삭제
+XGROUP DESTROY excel:download:queue excel-workers
+# Consumer group 목록 확인
+XINFO GROUPS excel:download:queue
+
+# Stream 존재 여부 확인
+EXISTS excel:download:queue
+# 또는 Stream 자체를 삭제 (모든 데이터 삭제)
+DEL excel:download:queue

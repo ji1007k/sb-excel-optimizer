@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -54,6 +55,12 @@ public class ExcelDownloadServiceV2 {
                     Function.identity()
                 ));
         log.info("Excel download strategies initialized: {}", strategyMap.keySet());
+    }
+
+    @Scheduled(fixedDelay = 1000)
+    private void scheduledProcessQueue() {
+        // 1초마다 작업 처리 진행
+        processQueue();
     }
 
     /**
@@ -113,7 +120,7 @@ public class ExcelDownloadServiceV2 {
                         log.warn("실패 진행률 전송 실패: {}", wsException.getMessage());
                     }
                 } finally {
-                    // 다음 요청 처리
+                    // 작업 환료 후 바로 다음 요청 처리
                     processQueue();
                 }
             }, downloadTaskExecutor);

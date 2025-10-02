@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -49,13 +50,18 @@ public class RedisDownloadQueue {
      */
     public void initConsumerGroup() {
         try {
-            // 1. Stream 생성
             if (!redisTemplate.hasKey(STREAM_KEY)) {
-                redisTemplate.opsForStream().add(STREAM_KEY, Map.of("init", "true"));
+                // 1. Stream 생성
+                RecordId recordId = redisTemplate.opsForStream().add(STREAM_KEY, Map.of("init", "true"));
+                // 2. Consumer Group 생성
+                redisTemplate.opsForStream().createGroup(STREAM_KEY, CONSUMER_GROUP);
+                // 3. 더미 메시지 삭제
+                redisTemplate.opsForStream().delete(STREAM_KEY, recordId);
+            } else {
+                // 이미 만들어진 Stream에 Consumer Group 생성
+                redisTemplate.opsForStream().createGroup(STREAM_KEY, CONSUMER_GROUP);
             }
 
-            // 2. Consumer Group 생성
-            redisTemplate.opsForStream().createGroup(STREAM_KEY, CONSUMER_GROUP);
             log.info("Redis Consumer Group initialized: {}", CONSUMER_GROUP);
         } catch (Exception e) {
             // 이미 Group이 있으면 에러 발생 → 무시하고 진행
@@ -203,6 +209,73 @@ public class RedisDownloadQueue {
     }
 
     /**
+     * 서버 재시작 시 Pending 메시지 복구
+     * Consumer Group에 남아있는 미완료 작업을 다시 큐에 추가
+     */
+    public void recoverPendingMessages() {
+        try {
+            // 1. 현재 Consumer의 Pending 메시지 조회
+            PendingMessages pending = redisTemplate.opsForStream().pending(
+                    STREAM_KEY,
+                    Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
+                    Range.unbounded(),
+                    Long.MAX_VALUE
+            );
+
+            if (pending == null || pending.isEmpty()) {
+                log.info("No pending messages to recover");
+                return;
+            }
+
+            log.warn("Found {} pending messages, recovering...", pending.size());
+
+            // 2. 각 Pending 메시지 처리
+            for (PendingMessage msg : pending) {
+                String recordId = msg.getId().getValue();
+
+                // 3. 원본 메시지 읽기
+                List<MapRecord<String, Object, Object>> records =
+                        redisTemplate.opsForStream().range(
+                                STREAM_KEY,
+                                Range.closed(recordId, recordId)
+                        );
+
+                if (!records.isEmpty()) {
+                    MapRecord<String, Object, Object> record = records.get(0);
+                    String requestJson = (String) record.getValue().get("data");
+                    DownloadRequest request = objectMapper.readValue(
+                            requestJson, DownloadRequest.class);
+
+                    // 4. 처리 중 목록에서 제거
+                    redisTemplate.opsForSet().remove(
+                            PROCESSING_SET_KEY, request.getRequestId());
+
+                    // 5. RecordId 매핑 삭제
+                    redisTemplate.opsForHash().delete(
+                            RECORD_ID_MAP_KEY, request.getRequestId());
+
+                    // 6. 원본 ACK (Pending에서 제거)
+                    redisTemplate.opsForStream().acknowledge(
+                            STREAM_KEY, CONSUMER_GROUP, recordId);
+
+                    // 7. 원본 삭제
+                    redisTemplate.opsForStream().delete(STREAM_KEY, recordId);
+
+                    // 8. 다시 큐에 추가
+                    enqueue(request);
+
+                    log.info("Recovered pending message: {}", request.getRequestId());
+                }
+            }
+
+            log.info("Pending message recovery completed");
+
+        } catch (Exception e) {
+            log.error("Failed to recover pending messages", e);
+        }
+    }
+
+    /**
      * 통계 조회
      */
     public int getSuccessTaskCount() {
@@ -229,6 +302,7 @@ public class RedisDownloadQueue {
         redisTemplate.delete(FAILED_COUNTER_KEY);
         log.info("Redis counters reset");
     }
+
 
     /**
      * 큐 상태 조회
