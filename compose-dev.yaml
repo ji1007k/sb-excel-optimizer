@@ -1,0 +1,21 @@
+services:
+  # 다중 컨테이너가 공유할 저장소
+  redis-dev:
+    # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
+    image: redis:7-alpine
+    container_name: excel-redis-dev
+    ports:
+      - "26379:6379"
+    volumes:
+      - ./redis-dev-data:/data
+    command: redis-server --appendonly yes # AOF 방식 영속화
+    networks:
+      - dev-network
+
+networks:
+  dev-network:
+    name: excel-dev-network
+    driver: bridge
+
+volumes:
+  redis-dev-data:

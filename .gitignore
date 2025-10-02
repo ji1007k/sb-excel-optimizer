@@ -87,3 +87,4 @@ target/
 # Heap dump
 *.hprof
 
+/tmp/

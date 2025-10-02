@@ -154,12 +154,12 @@
             
             websocket.onclose = function() {
                 updateWSStatus(false);
-                addLog('WebSocket 연결 끊김');
+                // addLog('WebSocket 연결 끊김');   // TODO REDIS PUB/SUB 전환 후 활성화
                 setTimeout(() => connectWebSocket(currentUserId), 3000);
             };
 
             websocket.onerror = function(error) {
-                addLog('WebSocket 오류: ' + error);
+                // addLog('WebSocket 오류: ' + error);    // TODO REDIS PUB/SUB 전환 후 활성화
             };
         }
 

@@ -24,6 +24,7 @@ public class AppConfig {
         log.info("Initializing Redis configurations...");
 
         redisDownloadQueue.initConsumerGroup();         // Consumer Group 생성
+        redisDownloadQueue.initConsumerName();          // Consumer 이름 생성
         redisDownloadQueue.recoverPendingMessages();    // Pending 메시지 복구
 
         log.info("Redis configurations initialized successfully");

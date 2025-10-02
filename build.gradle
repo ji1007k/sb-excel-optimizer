@@ -25,7 +25,7 @@ dependencies {
 
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'org.springframework.boot:spring-boot-docker-compose'
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'   // bootRun만 적용. jar 빌드 시 제외
 
     // Excel
     implementation 'org.apache.poi:poi:5.4.1'

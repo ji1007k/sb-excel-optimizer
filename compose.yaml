@@ -1,13 +1,67 @@
 services:
-  redis:
+  # 다중 컨테이너가 공유할 저장소
+  redis-prod:
     # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
     image: redis:7-alpine
+    container_name: excel-redis-prod
     ports:
       - "36379:6379"
     volumes:
-      - redis-data:/data
+      - ./redis-data:/data
     command: redis-server --appendonly yes # AOF 방식 영속화
+    networks:
+      - prod-network
 
+
+  # Applications
+  app1:
+    build: .                      # ← Dockerfile로 이미지 빌드
+    container_name: excel-app-1
+    ports:
+      - "8082:8080"               # ← 외부:내부 포트
+    depends_on:
+#      - postgres
+      - redis-prod
+    networks:
+      - prod-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux에서도 작동
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/ec_db
+      SPRING_DATA_REDIS_HOST: redis-prod
+      SPRING_DATA_REDIS_PORT: 6379
+      SERVER_PORT: 8080
+    volumes:
+      - ./downloads:/app/downloads  # 파일 저장 경로
+      - ./app1/tmp:/tmp
+
+  app2:
+    build: .                      # ← 같은 이미지 사용
+    container_name: excel-app-2
+    ports:
+      - "8083:8080"               # ← 다른 외부 포트
+    depends_on:
+#      - postgres
+      - redis-prod
+    networks:
+      - prod-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux에서도 작동
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/ec_db
+      SPRING_DATA_REDIS_HOST: redis-prod
+      SPRING_DATA_REDIS_PORT: 6379
+      SERVER_PORT: 8080
+    volumes:
+      - ./downloads:/app/downloads  # 파일 저장 경로
+      - ./app2/tmp:/tmp
+
+networks:
+  prod-network:
+    name: excel-prod-network
+    driver: bridge
 
 volumes:
   redis-data:

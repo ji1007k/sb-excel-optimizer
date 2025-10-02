@@ -1,50 +1,42 @@
-# Excel Performance Optimizer Configuration
-
-# 프로파일 공통 설정
+# -----------------------------------------------------------------------------
+# 1. 공통 설정 (기본값)
+# -----------------------------------------------------------------------------
 spring:
   application:
     name: excel-performance-optimizer
 
-  # 프로파일 기본값
   profiles:
-    active: dev
+    active: dev # 기본 프로파일 설정
 
-  # Redis 설정
-  data:
-    redis:
-      host: localhost
-      port: 36379
-
-  # JPA 설정
+  # JPA/Hibernate 공통 설정 (모든 프로파일에 적용)
   jpa:
     show-sql: true
     properties:
       hibernate:
         format_sql: true
         use_sql_comments: true
-        # Batch Insert 최적화
+        # Batch Insert 최적화 설정
         jdbc:
           batch_size: 1000
           batch_versioned_data: true
         order_inserts: true
         order_updates: true
 
----
-# 로깅 설정
+# -----------------------------------------------------------------------------
+# 2. 서버 & 애플리케이션 공통 설정
+# -----------------------------------------------------------------------------
+server:
+  port: 8081
+
 logging:
-  level:
-    com.performance.excel: DEBUG
-    org.springframework.web.socket: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    com.performance.excel: DEBUG  # 기본 디버그 레벨
+    org.springframework.web.socket: DEBUG
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
-# 서버 설정
-server:
-  port: 8081  # ecommerce와 다른 포트 사용
-
-# Excel 다운로드 설정
 excel:
   download:
     directory: downloads/
@@ -56,41 +48,31 @@ excel:
     max-columns: 1000
     enable-strict-validation: true
 
+# -----------------------------------------------------------------------------
+# 3. 개발 프로파일 (dev)
+# -----------------------------------------------------------------------------
 ---
-# 테스트 프로파일
-spring:
-  config:
-    activate:
-      on-profile: test
-
-  # H2 Database 설정 (테스트용)
-  datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-
-  # H2 Console 설정
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
----
-# 개발 프로파일
 spring:
   config:
     activate:
       on-profile: dev
 
-  # PostgreSQL Database 설정 (개발용)
+  # Docker Compose 설정
+  docker:
+    compose:
+      enabled: true
+      file: ./compose-dev.yaml
+      # 타임아웃 시간 증가. 기본 2분(PT2M)
+      readiness:
+        timeout: PT2M
+
+  # Redis 설정
+  data:
+    redis:
+      host: localhost
+      port: 26379
+
+  # PostgreSQL Database 설정
   datasource:
     url: jdbc:postgresql://localhost:5432/ec_db
     driver-class-name: org.postgresql.Driver
@@ -105,28 +87,73 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: update # 개발 환경: 스키마 변경 시 업데이트
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: false
-        show_sql: false
 
+  logging:
+    level:
+      com.performance.excel: INFO
+      org.springframework.web: WARN
+      org.hibernate: WARN
+      root: WARN
+
+# -----------------------------------------------------------------------------
+# 4. 테스트 프로파일 (test)
+# -----------------------------------------------------------------------------
 ---
-# 운영 프로파일
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  # H2 Database 설정 (In-Memory)
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop # 테스트 환경: 실행 시마다 스키마 재생성
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  h2:
+    console:
+      enabled: false
+
+  logging:
+    level:
+      org.hibernate.SQL: INFO # 테스트 시 쿼리 로그 INFO로 전환
+
+# -----------------------------------------------------------------------------
+# 5. 운영 프로파일 (prod)
+# -----------------------------------------------------------------------------
+---
 spring:
   config:
     activate:
       on-profile: prod
 
-  # PostgreSQL Database 설정 (운영용)
+  # Docker Compose 설정
+  docker:
+    compose:
+      enabled: true
+      file: ./compose.yaml
+
+  # PostgreSQL Database 설정 (환경 변수 사용)
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/excel_optimizer}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ec_db}
     driver-class-name: org.postgresql.Driver
-    username: ${DB_USERNAME:excel_user}
-    password: ${DB_PASSWORD:excel_pwd}
+    username: ${DB_USERNAME:ec_user}
+    password: ${DB_PASSWORD:ec_pwd}
     hikari:
-      maximum-pool-size: 50
+      maximum-pool-size: 50 # 운영 환경: 풀 사이즈 증가
       minimum-idle: 10
       connection-timeout: 30000
       idle-timeout: 600000
@@ -134,13 +161,17 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate # 운영 환경: 스키마 유효성 검증만 수행 (자동 변경 금지)
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-    show-sql: false
 
-  # 운영 로깅 설정
+  # Redis 설정
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:36379} # 운영 Redis 포트
+
   logging:
     level:
       com.performance.excel: INFO

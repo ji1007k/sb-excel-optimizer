@@ -26,10 +26,10 @@ public class RedisDownloadQueue {
     @Qualifier("redisObjectMapper") // Spring 4.3+ 부터 필드 레벨 @Qualifier 지원
     private final ObjectMapper objectMapper;
 
+    private static final int MAX_CONCURRENT_DOWNLOADS = 3;
     private static final String STREAM_KEY = "excel:download:queue";
     private static final String CONSUMER_GROUP = "excel-workers";
-    private static final String CONSUMER_NAME = "worker-1";
-    private static final int MAX_CONCURRENT_DOWNLOADS = 3;
+    private String CONSUMER_NAME;
 
     // 통계 키
     /*
@@ -68,6 +68,17 @@ public class RedisDownloadQueue {
             log.warn("Consumer Group already exists: {}", e.getMessage());
         }
     }
+
+    public void initConsumerName() {
+        String hostname = System.getenv("HOSTNAME");
+
+        this.CONSUMER_NAME = hostname != null
+                ? "worker-" + hostname
+                : "worker-local";
+
+        log.info("Consumer initialized: {}", CONSUMER_NAME);
+    }
+
 
     /**
      * 큐에 작업 추가
@@ -217,7 +228,8 @@ public class RedisDownloadQueue {
             // 1. 현재 Consumer의 Pending 메시지 조회
             PendingMessages pending = redisTemplate.opsForStream().pending(
                     STREAM_KEY,
-                    Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
+                    CONSUMER_GROUP, // Redis가 알아서 다시 분배하도록 Group만 지정
+//                    Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),
                     Range.unbounded(),
                     Long.MAX_VALUE
             );
