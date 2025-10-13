@@ -17,6 +17,11 @@ import java.util.List;
 import java.util.Map;
 
 
+/*Producer-Consumer 패턴
+    작업 큐 기반 패턴
+    Producer(생산자)가 작업을 큐에 넣음
+    Consumer(소비자)가 큐에서 작업을 꺼내서 처리
+*/
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -129,7 +134,7 @@ public class RedisDownloadQueue {
                 └─ 0: 같은 밀리초에 여러 개 들어오면 순번 (0, 1, 2...)
              */
             List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
-                    Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),     // TODO 서버 ID 동적 생성. Redis가 자동으로 작업 분배
+                    Consumer.from(CONSUMER_GROUP, CONSUMER_NAME),     // 서버 ID 동적 생성. Redis가 자동으로 작업 분배
                     StreamReadOptions.empty().count(1).block(Duration.ofSeconds(1)),  // 큐가 비어있으면 1초 대기 (폴링)
                     StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
             );

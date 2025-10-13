@@ -18,6 +18,10 @@ repositories {
     mavenCentral()
 }
 
+/**
+ * developmentOnly: dev 프로파일에만 의존성 적용. 테스트 런타임 시 미적용
+ * testAndDevelopmentOnly: Spring Boot 3.2+ 에서 추가된 설정. dev & test 프로파일에 의존성 적용
+ */
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -25,7 +29,7 @@ dependencies {
 
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'   // bootRun만 적용. jar 빌드 시 제외
+    testAndDevelopmentOnly 'org.springframework.boot:spring-boot-docker-compose'   // bootRun, test 시 compose.yaml 자동 실행 (jar 빌드 시x)
 
     // Excel
     implementation 'org.apache.poi:poi:5.4.1'

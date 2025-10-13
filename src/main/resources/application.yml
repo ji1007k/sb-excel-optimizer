@@ -27,7 +27,11 @@ spring:
 # -----------------------------------------------------------------------------
 server:
   port: 8081
-
+  # 내장 톰캣 설정
+  tomcat:
+    threads:
+      max: 200  # default
+      
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -42,6 +46,7 @@ excel:
     directory: downloads/
     max-concurrent: 3
     batch-size: 1000
+    poll-interval: 1000
   security:
     max-file-size: 100MB
     max-rows: 1000000
@@ -62,7 +67,7 @@ spring:
     compose:
       enabled: true
       file: ./compose-dev.yaml
-      # 타임아웃 시간 증가. 기본 2분(PT2M)
+      # 타임아웃 시간. 기본 2분(PT2M)
       readiness:
         timeout: PT2M
 
@@ -107,6 +112,23 @@ spring:
   config:
     activate:
       on-profile: test
+
+  # Docker Compose 설정
+  docker:
+    compose:
+      enabled: true
+      file: ./compose-dev.yaml
+      # 타임아웃 시간. 기본 2분(PT2M)
+      readiness:
+        timeout: PT2M
+      skip:
+        in-tests: false   # Docker Compose 지원 활성화 <-> true (비활성화. 기본)
+
+  # Redis 설정
+  data:
+    redis:
+      host: localhost
+      port: 26379
 
   # H2 Database 설정 (In-Memory)
   datasource:

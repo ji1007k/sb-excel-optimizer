@@ -41,6 +41,7 @@ public class ExcelDownloadServiceV2 {
     @Value("${excel.download.directory:downloads/}")
     private String downloadDirectory;
 
+
     // 전략 매핑 (초기화 시 생성)
     private Map<DownloadRequest.DownloadType, ExcelDownloadStrategy> strategyMap;
 
@@ -57,7 +58,7 @@ public class ExcelDownloadServiceV2 {
         log.info("Excel download strategies initialized: {}", strategyMap.keySet());
     }
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelayString = "${excel.download.poll-interval}")
     private void scheduledProcessQueue() {
         // 1초마다 작업 처리 진행
         processQueue();
@@ -120,10 +121,10 @@ public class ExcelDownloadServiceV2 {
                         log.warn("실패 진행률 전송 실패: {}", wsException.getMessage());
                     }
                 } finally {
-                    // 작업 환료 후 바로 다음 요청 처리
+                    // 작업 완료 후 바로 다음 요청 처리
                     processQueue();
                 }
-            }, downloadTaskExecutor);
+            }, downloadTaskExecutor);   // 명시적 Executor 지정 (스레드 풀 제어)
         }
     }
 
