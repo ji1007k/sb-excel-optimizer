@@ -129,7 +129,7 @@
         async function initialize() {
             try {
                 currentUserId = `user_${Date.now() + '_' + Math.random().toString(36).substring(2, 9)}`;
-                addLog(`🔗 사용자 ID 초기화: ${currentUserId.substring(0, 8)}...`);
+                addLog(`🔗 사용자 ID 초기화: ${currentUserId.substring(0, currentUserId.indexOf('_'))}...`);
                 
                 // WebSocket 연결
                 connectWebSocket(currentUserId);
@@ -140,8 +140,12 @@
         
         // WebSocket 연결
         function connectWebSocket() {
-            websocket = new WebSocket(`ws://localhost:8081/ws/download-progress?userId=${currentUserId}`);
-            
+            // 현재 페이지의 호스트 정보 사용
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host; // localhost:8080 or example.com
+
+            websocket = new WebSocket(`${protocol}//${host}/ws/download-progress?userId=${currentUserId}`);
+
             websocket.onopen = function() {
                 updateWSStatus(true);
                 addLog('WebSocket 연결됨 - 사용자 ID: ' + currentUserId.substring(0, 8) + '...');

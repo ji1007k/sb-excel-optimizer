@@ -2,20 +2,35 @@ services:
   # 다중 컨테이너가 공유할 저장소
   redis-dev:
     # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
+    # spring boot가 redis에 자동으로 연결 설정
     image: redis:7-alpine
     container_name: excel-redis-dev
     ports:
       - "26379:6379"
     volumes:
-      - ./redis-dev-data:/data
+      - ./docker/dev/redis/redis-dev-data:/data
     command: redis-server --appendonly yes # AOF 방식 영속화
     networks:
       - dev-network
+
+  # nginx 로드밸런싱
+  nginx-dev:
+    image: nginx:alpine
+    container_name: excel-nginx-dev
+    volumes:
+      - ./docker/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux 호환
+#    network_mode: "host"  # bridge 대신 host 네트워크
+#    networks:  # 설정 없으면 기본 네트워크 사용(host 접근 가능)
+#      - dev-network # 이 네트워크 안에서 host.docker.internal 이 막힘
 
 networks:
   dev-network:
     name: excel-dev-network
     driver: bridge
 
-volumes:
-  redis-dev-data:
+#volumes:
+#  redis-dev-data:

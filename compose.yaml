@@ -1,5 +1,6 @@
 services:
   # 다중 컨테이너가 공유할 저장소
+  # spring boot가 redis에 자동으로 연결 설정
   redis-prod:
     # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
     image: redis:7-alpine
@@ -7,11 +8,25 @@ services:
     ports:
       - "36379:6379"
     volumes:
-      - ./redis-data:/data
+      - ./docker/prod/redis/redis-data:/data
     command: redis-server --appendonly yes # AOF 방식 영속화
     networks:
       - prod-network
 
+  # nginx 로드밸런싱
+  nginx-prod:
+    image: nginx:alpine
+    container_name: excel-nginx-prod
+    ports:
+      - "8090:80"
+    restart: on-failure  # 실패하면 재시작
+    depends_on:
+      - app1
+      - app2
+    volumes:
+      - ./docker/prod/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - prod-network
 
   # Applications
   app1:
@@ -32,9 +47,10 @@ services:
       SPRING_DATA_REDIS_HOST: redis-prod
       SPRING_DATA_REDIS_PORT: 6379
       SERVER_PORT: 8080
+      HOSTNAME: app1
     volumes:
-      - ./downloads:/app/downloads  # 파일 저장 경로
-      - ./app1/tmp:/tmp
+      - ./docker/prod/apps/app1/downloads:/app/downloads  # 파일 저장 경로
+      - ./docker/prod/apps/app1/tmp:/tmp
 
   app2:
     build: .                      # ← 같은 이미지 사용
@@ -54,14 +70,15 @@ services:
       SPRING_DATA_REDIS_HOST: redis-prod
       SPRING_DATA_REDIS_PORT: 6379
       SERVER_PORT: 8080
+      HOSTNAME: app2
     volumes:
-      - ./downloads:/app/downloads  # 파일 저장 경로
-      - ./app2/tmp:/tmp
+      - ./docker/prod/apps/app2/downloads:/app/downloads  # 파일 저장 경로
+      - ./docker/prod/apps/app2/tmp:/tmp
 
 networks:
   prod-network:
     name: excel-prod-network
     driver: bridge
 
-volumes:
-  redis-data:
+#volumes:
+#  redis-data:

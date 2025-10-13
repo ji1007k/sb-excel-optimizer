@@ -120,10 +120,10 @@ public class ExcelDownloadServiceV2 {
                     } catch (Exception wsException) {
                         log.warn("실패 진행률 전송 실패: {}", wsException.getMessage());
                     }
-                } finally {
+                } /*finally {   // TODO 검토 후 삭제 (스케줄러로 대신 함)
                     // 작업 완료 후 바로 다음 요청 처리
                     processQueue();
-                }
+                }*/
             }, downloadTaskExecutor);   // 명시적 Executor 지정 (스레드 풀 제어)
         }
     }

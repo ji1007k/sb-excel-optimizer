@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.performance.excel.dto.DownloadProgress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.Message;
+import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -18,9 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class ProgressWebSocketHandler extends TextWebSocketHandler {
+public class ProgressWebSocketHandler extends TextWebSocketHandler
+        implements MessageListener {
     
     private final ObjectMapper objectMapper;
+    private final RedisTemplate<String, String> stringRedisTemplate;    // excel 다운로드 진행률 저장용
     private final ConcurrentHashMap<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     
     // 사용자 ID -> 웹소켓 세션 ID 매핑
@@ -61,62 +66,55 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
      * WebSocket 동시성 문제 해결을 위한 동기화 처리
      */
     public synchronized void sendProgress(String userId, DownloadProgress progress) {
-        String webSocketSessionId = userIdToWebSocketSessionMapping.get(userId);
-        if (webSocketSessionId != null) {
-            WebSocketSession session = sessions.get(webSocketSessionId);
+        try {
+            String message = objectMapper.writeValueAsString(progress);
+            stringRedisTemplate.convertAndSend("excel:progress", userId + ":" + message);
+
+            log.debug("Progress sent to session {}: {}%", userId, progress.getProgressPercentage());
+        } catch (IOException e) {
+            log.error("Failed to send progress to session: {}", userId, e);
+        } catch (Exception e) {
+            log.error("WebSocket state error for session {}: {}", userId, e.getMessage());
+        }
+    }
+
+    // TODO 메시지 포맷 검증
+    @Override
+    public void onMessage(Message message, byte[] pattern) {
+        try {
+            String msg = new String(message.getBody());
+            String[] parts = msg.split(":", 2);
+            String userId = parts[0];
+            String progressJson = parts[1];
+
+            sendToLocalSession(userId, progressJson);
+        } catch (Exception e) {
+            log.error("Failed to handle message", e);
+        }
+    }
+
+    private synchronized void sendToLocalSession(String userId, String message) {
+        String wsId = userIdToWebSocketSessionMapping.get(userId);
+        if (wsId != null) {
+            WebSocketSession session = sessions.get(wsId);
             if (session != null && session.isOpen()) {
                 try {
-                    String message = objectMapper.writeValueAsString(progress);
                     synchronized (session) {
                         session.sendMessage(new TextMessage(message));
                     }
-                    log.debug("Progress sent to session {}: {}%", userId, progress.getProgressPercentage());
-                } catch (IOException e) {
-                    log.error("Failed to send progress to session: {}", userId, e);
-                    sessions.remove(webSocketSessionId);
-                    userIdToWebSocketSessionMapping.remove(userId);
+                    log.debug("진행률 전송 성공: userId={}", userId);
                 } catch (Exception e) {
-                    log.error("WebSocket state error for session {}: {}", userId, e.getMessage());
-                    // WebSocket 상태 오류 발생 시 메시지 미전송
-//                    broadcastProgressSafe(progress);
+                    log.error("Send failed", e);
+                    // 세션 정리
+                    sessions.remove(wsId);
+                    userIdToWebSocketSessionMapping.remove(userId);
                 }
+            } else {
+                log.warn("WebSocket 세션 닫힘: userId={}", userId);
             }
         } else {
-            log.warn("No WebSocket session found for userId: {} (connected sessions: {})",
-                    userId, sessions.size());
-            
-            // 대안: 안전한 브로드캐스트
-            log.info("Falling back to broadcast for requestId: {}", progress.getRequestId());
-            broadcastProgressSafe(progress);
+            log.debug("해당 서버에 userId={} 세션 없음 (다른 서버에 있음)", userId);
         }
-    }
-    
-    /**
-     * 모든 활성 세션에 메시지 브로드캐스트 (안전한 버전)
-     */
-    public synchronized void broadcastProgressSafe(DownloadProgress progress) {
-        sessions.values().parallelStream()
-                .filter(WebSocketSession::isOpen)
-                .forEach(session -> {
-                    try {
-                        synchronized (session) {
-                            if (session.isOpen()) {
-                                String message = objectMapper.writeValueAsString(progress);
-                                session.sendMessage(new TextMessage(message));
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to broadcast to session: {}", session.getId(), e);
-                        sessions.remove(session.getId());
-                    }
-                });
-    }
-    
-    /**
-     * 모든 활성 세션에 메시지 브로드캐스트 (기존 버전 - 호환성용)
-     */
-    public void broadcastProgress(DownloadProgress progress) {
-        broadcastProgressSafe(progress);
     }
     
     /**
@@ -140,11 +138,5 @@ public class ProgressWebSocketHandler extends TextWebSocketHandler {
             return null;
         }
     }
-    
-    /**
-     * 활성 세션 수 조회
-     */
-    public int getActiveSessionCount() {
-        return sessions.size();
-    }
+
 }
