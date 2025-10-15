@@ -188,6 +188,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/postgres/schema.sql
+      continue-on-error: true  # 에러 발생해도 중단x
+
   # Redis 설정
   data:
     redis:

@@ -1,79 +1,102 @@
 services:
-  # 다중 컨테이너가 공유할 저장소
-  # spring boot가 redis에 자동으로 연결 설정
   redis-prod:
-    # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
     image: redis:7-alpine
     container_name: excel-redis-prod
     ports:
       - "36379:6379"
     volumes:
-      - ./docker/prod/redis/redis-data:/data
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/prod/db/redis/redis-data:/data
     command: redis-server --appendonly yes # AOF 방식 영속화
     networks:
       - prod-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # nginx 로드밸런싱
-  nginx-prod:
-    image: nginx:alpine
-    container_name: excel-nginx-prod
+  postgres-prod:
+    image: postgres:15-alpine
+    container_name: excel-postgres-prod
     ports:
-      - "8090:80"
-    restart: on-failure  # 실패하면 재시작
-    depends_on:
-      - app1
-      - app2
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: ec_db
+      POSTGRES_USER: ec_user
+      POSTGRES_PASSWORD: ec_pwd
     volumes:
-      - ./docker/prod/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ~/docker/postgres-data:/var/lib/postgresql/data  # WSL 홈 디렉토리에 마운트. /mnt/c/ 는 chmod 불가로 마운트 불가
     networks:
       - prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ec_user -d ec_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Applications
   app1:
-    build: .                      # ← Dockerfile로 이미지 빌드
+    build: .
     container_name: excel-app-1
     ports:
-      - "8082:8080"               # ← 외부:내부 포트
+      - "8082:8080"
     depends_on:
-#      - postgres
-      - redis-prod
+      postgres-prod:
+        condition: service_healthy
+      redis-prod:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - prod-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # Linux에서도 작동
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/ec_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-prod:5432/ec_db
       SPRING_DATA_REDIS_HOST: redis-prod
       SPRING_DATA_REDIS_PORT: 6379
       SERVER_PORT: 8080
       HOSTNAME: app1
     volumes:
-      - ./docker/prod/apps/app1/downloads:/app/downloads  # 파일 저장 경로
-      - ./docker/prod/apps/app1/tmp:/tmp
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/prod/apps/app1/downloads:/app/downloads
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/prod/apps/app1/tmp:/tmp
 
   app2:
-    build: .                      # ← 같은 이미지 사용
+    build: .
     container_name: excel-app-2
     ports:
-      - "8083:8080"               # ← 다른 외부 포트
+      - "8083:8080"
     depends_on:
-#      - postgres
-      - redis-prod
+      postgres-prod:
+        condition: service_healthy
+      redis-prod:
+        condition: service_healthy
     networks:
       - prod-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # Linux에서도 작동
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/ec_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-prod:5432/ec_db
       SPRING_DATA_REDIS_HOST: redis-prod
       SPRING_DATA_REDIS_PORT: 6379
       SERVER_PORT: 8080
       HOSTNAME: app2
     volumes:
-      - ./docker/prod/apps/app2/downloads:/app/downloads  # 파일 저장 경로
-      - ./docker/prod/apps/app2/tmp:/tmp
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/prod/apps/app2/downloads:/app/downloads
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/prod/apps/app2/tmp:/tmp
+
+  nginx-prod:
+    image: nginx:alpine
+    container_name: excel-nginx-prod
+    ports:
+      - "8090:80"
+    restart: on-failure  # 실패 시 재시작
+    depends_on:
+      - app1
+      - app2
+    volumes:
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/prod/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - prod-network
+
 
 networks:
   prod-network:
