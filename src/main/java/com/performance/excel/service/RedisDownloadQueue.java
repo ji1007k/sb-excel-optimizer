@@ -31,7 +31,8 @@ public class RedisDownloadQueue {
     @Qualifier("redisObjectMapper") // Spring 4.3+ 부터 필드 레벨 @Qualifier 지원
     private final ObjectMapper objectMapper;
 
-    private static final int MAX_CONCURRENT_DOWNLOADS = 3;
+    // 전용 스레드풀 corePoolSize 와 동일하게 설정
+    private static final int MAX_CONCURRENT_DOWNLOADS = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
     private static final String STREAM_KEY = "excel:download:queue";
     private static final String CONSUMER_GROUP = "excel-workers";
     private String CONSUMER_NAME;

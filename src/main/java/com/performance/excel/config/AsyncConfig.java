@@ -10,16 +10,19 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
 public class AsyncConfig implements AsyncConfigurer {
-    
+
+    /**
+     * 엑셀 다운로드 작업 전용 스레드풀
+     */
     @Bean("downloadTaskExecutor")
     public ThreadPoolTaskExecutor downloadTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         
-        // CPU 집약적 작업 고려한 스레드 풀 설정
-        int corePoolSize = Math.max(2, Runtime.getRuntime().availableProcessors() / 2); // 서버의 CPU 코어 수에 따라 동적으로 결정
-        executor.setCorePoolSize(corePoolSize);     // 기본적으로 유지되는 핵심 스레드 수 (항상 살아 있음)
-        executor.setMaxPoolSize(corePoolSize * 2);  // 큐가 꽉 찼을 때 추가로 늘릴 수 있는 최대 스레드 개수
-        executor.setQueueCapacity(100); // 스레드가 모두 바쁠 때, 새로운 작업 요청들이 대기하게 되는 큐의 크기
+        // CPU 집약적 작업 고려한 스레드 풀 설정 (서버 CPU 코어 수에 따라 동적으로 결정)
+        int corePoolSize = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
+        executor.setCorePoolSize(corePoolSize);         // 기본적으로 유지되는 핵심 스레드 수 (항상 살아 있음)
+        executor.setMaxPoolSize(corePoolSize * 2);      // 큐가 꽉 찼을 때 추가로 늘릴 수 있는 최대 스레드 개수
+        executor.setQueueCapacity(corePoolSize * 10);   // 스레드가 모두 바쁠 때, 새로운 작업 요청들이 대기하게 되는 큐의 크기
 
         // 스레드 이름 설정
         executor.setThreadNamePrefix("Download-");

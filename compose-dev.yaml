@@ -1,36 +1,43 @@
 services:
   # 다중 컨테이너가 공유할 저장소
   redis-dev:
-    # Windows OS에서 redis streams 사용을 위한 버전 미지원으로 docker 사용
-    # spring boot가 redis에 자동으로 연결 설정
+    # Windows에서 Redis Streams 사용을 위해 Docker 컨테이너로 실행
+    # Spring Boot가 자동으로 연결 설정
     image: redis:7-alpine
     container_name: excel-redis-dev
     ports:
-      - "26379:6379"
+      - "26379:6379"  # ← 외부:내부 포트
     volumes:
-      - ./docker/dev/redis/redis-dev-data:/data
+      # WSL(리눅스) 안에서 실행되는 Docker 엔진은 리눅스 관점 경로 필요 (상대경로는 불안정)
+      # 직접 경로 지정 (Bind Mount). 사용자 설정 경로:컨테이너 내부 경로 마운트
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/dev/redis/redis-dev-data:/data
+      # Docker에게 위임 (Named Volume). Docker가 관리하는 경로:컨테이너 내부 경로 마운트
+      #- redis-data-managed:/data
     command: redis-server --appendonly yes # AOF 방식 영속화
     networks:
       - dev-network
 
-  # nginx 로드밸런싱
   nginx-dev:
+    # 로드밸런싱용 Nginx (수동 실행 필요. Spring Boot 관리 대상 아님)
     image: nginx:alpine
     container_name: excel-nginx-dev
-    volumes:
-      - ./docker/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8080:80"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # Linux 호환
-#    network_mode: "host"  # bridge 대신 host 네트워크
-#    networks:  # 설정 없으면 기본 네트워크 사용(host 접근 가능)
-#      - dev-network # 이 네트워크 안에서 host.docker.internal 이 막힘
+    restart: on-failure  # 실패 시 재시작
+    volumes:
+      - /mnt/c/APPS/PROJECTS/0_PRACTICE/excel-optimizer/docker/dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    # 네트워크 설정 옵션들:
+    # extra_hosts:  # host.docker.internal을 IP로 매핑 (Linux 호환용)
+    #   - "host.docker.internal:host-gateway"
+    # network_mode: "host"  # bridge 대신 host 네트워크 사용
+    # networks:  # 미설정 시 기본 네트워크 사용 (host 접근 가능)
+    #   - dev-network  # 이 네트워크 안에서는 host.docker.internal 접근 불가
 
 networks:
   dev-network:
     name: excel-dev-network
     driver: bridge
 
+# 실제 데이터가 저장될 공간 관리 Docker에 위임
 #volumes:
-#  redis-dev-data:
+#  redis-data-managed:
